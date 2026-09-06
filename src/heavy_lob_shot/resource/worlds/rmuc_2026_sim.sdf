@@ -1,0 +1,150 @@
+<?xml version="1.0" ?>
+<!-- Jazzy / Gazebo Harmonic 8。场：model://rmuc_2026；车：model://simulation_robot（PolarBear/rmoss mesh）。 -->
+<sdf version="1.8">
+  <world name="rmuc_2026">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type="adiabatic"/>
+    <scene>
+      <ambient>0.78 0.78 0.80 1</ambient>
+      <background>0.42 0.45 0.48 1</background>
+      <shadows>false</shadows>
+    </scene>
+
+    <!-- 四角点光、无阴影：单方向光会把 STL 竖直面打黑；零光源则场地和车都看不见。 -->
+    <light type="point" name="fill_sw">
+      <cast_shadows>false</cast_shadows>
+      <visualize>false</visualize>
+      <pose>4 3 6 0 0 0</pose>
+      <diffuse>0.14 0.14 0.14 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <attenuation>
+        <range>40</range>
+        <constant>0.5</constant>
+        <linear>0.03</linear>
+        <quadratic>0</quadratic>
+      </attenuation>
+    </light>
+    <light type="point" name="fill_se">
+      <cast_shadows>false</cast_shadows>
+      <visualize>false</visualize>
+      <pose>25 3 6 0 0 0</pose>
+      <diffuse>0.14 0.14 0.14 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <attenuation>
+        <range>40</range>
+        <constant>0.5</constant>
+        <linear>0.03</linear>
+        <quadratic>0</quadratic>
+      </attenuation>
+    </light>
+    <light type="point" name="fill_nw">
+      <cast_shadows>false</cast_shadows>
+      <visualize>false</visualize>
+      <pose>4 13 6 0 0 0</pose>
+      <diffuse>0.14 0.14 0.14 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <attenuation>
+        <range>40</range>
+        <constant>0.5</constant>
+        <linear>0.03</linear>
+        <quadratic>0</quadratic>
+      </attenuation>
+    </light>
+    <light type="point" name="fill_ne">
+      <cast_shadows>false</cast_shadows>
+      <visualize>false</visualize>
+      <pose>25 13 6 0 0 0</pose>
+      <diffuse>0.14 0.14 0.14 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <attenuation>
+        <range>40</range>
+        <constant>0.5</constant>
+        <linear>0.03</linear>
+        <quadratic>0</quadratic>
+      </attenuation>
+    </light>
+
+    <gui fullscreen="false">
+      <plugin name="3D View" filename="GzScene3D">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">0</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <!-- 实际 GUI 走 resource/ign/gui.config（MinimalScene）。这里只作备份。 -->
+        <camera_pose>14.5 8 16 0 1.50 0</camera_pose>
+      </plugin>
+      <plugin name="World control" filename="WorldControl">
+        <play_pause>1</play_pause>
+        <step>1</step>
+        <start_paused>0</start_paused>
+      </plugin>
+      <plugin name="World stats" filename="WorldStats">
+        <sim_time>1</sim_time>
+        <real_time>1</real_time>
+        <real_time_factor>1</real_time_factor>
+      </plugin>
+    </gui>
+
+    <!-- 抄自 ITL rmu_gazebo_simulator/resource/worlds/rmuc_2026_world.sdf -->
+    <include>
+      <uri>model://rmuc_2026</uri>
+      <name>rmuc_2026</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+    <model name="base_target">
+      <static>true</static>
+      <pose>23.125 1.510 0 0 0 0</pose>
+      <link name="link">
+        <visual name="pole">
+          <pose>0 0 0.42 0 0 0</pose>
+          <geometry>
+            <cylinder>
+              <radius>0.06</radius>
+              <length>0.84</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.4 0.4 0.4 1</ambient>
+            <diffuse>0.55 0.55 0.55 1</diffuse>
+          </material>
+        </visual>
+        <visual name="light">
+          <pose>0 0 0.84 0 0 0</pose>
+          <geometry>
+            <sphere>
+              <radius>0.18</radius>
+            </sphere>
+          </geometry>
+          <material>
+            <ambient>0.0 0.9 0.2 1</ambient>
+            <diffuse>0.1 1.0 0.25 1</diffuse>
+            <emissive>0.0 0.55 0.1 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- PolarBear simulation_robot（rmua19 mesh），出生点抄 ITL gz_world.yaml 红方 -->
+    <include>
+      <uri>model://simulation_robot</uri>
+      <name>heavy_hero</name>
+      <pose>2.6 6.5 0.75 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

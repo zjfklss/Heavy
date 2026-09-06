@@ -1,0 +1,2 @@
+759d136b8a5202e4a256758b55adace43b995011 2026-04-11 12:02:55 +0800 修改sim_test.launch的硬编码路径问题
+https://github.com/qwq9966qwq/ITL_Hero_Shoot

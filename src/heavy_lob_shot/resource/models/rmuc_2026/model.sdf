@@ -1,0 +1,37 @@
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <model name='rmuc_2026'>
+    <static>true</static>
+    <link name='body'>
+      <pose frame=''>14.5 8 0.2 0 0 0</pose>
+      <self_collide>0</self_collide>
+      <kinematic>0</kinematic>
+      <gravity>1</gravity>
+      <visual name='visual'>
+        <cast_shadows>false</cast_shadows>
+        <geometry>
+          <mesh>
+            <uri>model://rmuc_2026/meshes/rmuc_2026_nowall.stl</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.72 0.72 0.74 1</ambient>
+          <diffuse>0.82 0.82 0.84 1</diffuse>
+          <specular>0.0 0.0 0.0 1</specular>
+          <emissive>0.22 0.22 0.23 1</emissive>
+        </material>
+      </visual>
+      <!-- 视觉仍是官方 12 万三角 STL。整场 mesh 碰撞会把 Harmonic RTF 打到 16% 以下，本机 GUI 像卡死。
+           碰撞改成贴地板的盒子（地板约 z=0.43）。墙/高台只看得到，暂不挡车。 -->
+      <collision name='collision'>
+        <pose>0 0 0.23 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>29.0 16.0 0.12</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

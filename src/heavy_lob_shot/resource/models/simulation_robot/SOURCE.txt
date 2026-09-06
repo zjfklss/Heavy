@@ -1,0 +1,17 @@
+车模几何整包拷自 ITL 仓内 PolarBear / rmoss，禁止再用盒子+球手搓。
+
+上游：
+- https://github.com/SMBU-PolarBear-Robotics-Team/pb2025_robot_description
+  resource/xmacro/simulation_robot.sdf.xmacro
+- https://github.com/robomaster-oss/rmoss_gz_resources
+  rmua19_standard_robot / rm25_example_robot / rm21_* modules
+本地母本：
+  /home/jlcv/jlauto-aim/ITL_Hero_Shoot/Simulation/src/pb2025_robot_description
+  /home/jlcv/jlauto-aim/ITL_Hero_Shoot/Simulation/src/rmoss_gz_resources
+
+model.sdf 由官方 xmacro 展开。相对原文只改了这些接口/环境：
+- Fortress 插件 LightBarController / MecanumDrive2 / ProjectileShooter / ignition-gazebo-*
+  换成 Harmonic 官方 MecanumDrive + JointPositionController + OdometryPublisher
+- 本队别名 link：base_link、muzzle（枪口 offset 抄 ITL ProjectileShooter 0.15 0 0）
+- 云台 pitch 限位放到能打高抛（官方步兵限位约 ±45° 不够）
+- Mid360 射线 1875x32@20 / 相机 1920x1080@30 降到本机能跑；mesh 未改

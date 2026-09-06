@@ -1,0 +1,8 @@
+RMUC 2026 官方场地模型，整包拷自
+/home/jlcv/jlauto-aim/ITL_Hero_Shoot/Simulation/src/rmu_gazebo_simulator/rmu_gazebo_simulator/resource/models/rmuc_2026
+上游：PolarBear rmu_gazebo_simulator（ITL 仓内 2026 网格）
+https://github.com/SMBU-PolarBear-Robotics-Team/rmu_gazebo_simulator
+世界用 model://rmuc_2026 include。视觉是官方 STL。
+碰撞不走 12 万三角网格（本机 RTF 会掉到不可用），改成贴地板的盒子。
+出生点抄 ITL gz_world.yaml rmuc_2026 red：(2.6, 6.5, 0.75)
+视觉用 rmuc_2026_nowall.stl：去掉 z>4.5 尖刺、贴外框的看台，以及左右各 2.05m / 两端 1.35m 内且 z>1.2 的看台残段（约 3.4m 高）。场心 r<4m 的能量机关保留。原版 rmuc_2026.stl 保留。

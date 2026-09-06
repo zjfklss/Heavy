@@ -1,0 +1,25 @@
+heavy_lob_manager:
+  ros__parameters:
+    # 蓝方基地中间偏平大装甲中心。2026 V2.2.0 图 4-5/4-11，换算见 docs/修改说明.md
+    target_x: 25.603
+    target_y: 8.000
+    target_z: 1.602
+    armor_top_z: 1.721
+    armor_bot_z: 1.214
+    bullet_speed: 16.5
+    friction_coeff: 0.001
+    gravity: 9.7915
+    feedback_mode: joint_state
+    map_frame: map
+    base_frame: base_link
+    muzzle_frame: muzzle
+    pitch_joint_name: pitch_joint
+    yaw_joint_name: yaw_joint
+    module_unlocked: false
+    module_docked: false
+    module_assembling: false
+    pitch_sign: 1.0
+    yaw_sign: 1.0
+    pitch_max_deg: 42.0
+    # base_link → muzzle，单位 m。改成机械实测，不要改 NUDT。
+    muzzle_xyz: [0.0, 0.0, 0.40]

@@ -1,0 +1,4 @@
+Copied from ITL_Hero_Shoot Real/src/control/projectile_motion
+upstream: https://github.com/qwq9966qwq/ITL_Hero_Shoot
+commit: 759d136b8a5202e4a256758b55adace43b995011
+patches: friction≈0 vacuum fallback; IterativeProjectileTool::solve_high vacuum-high seed.

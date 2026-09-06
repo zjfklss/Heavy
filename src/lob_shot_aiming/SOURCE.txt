@@ -1,0 +1,4 @@
+Copied from ITL_Hero_Shoot Real/src/control/lob_shot_aiming
+upstream: https://github.com/qwq9966qwq/ITL_Hero_Shoot
+commit: 759d136b8a5202e4a256758b55adace43b995011
+patches: chassis_frame still a parameter (NUDT uses base_link); solvePitch uses GAF solve_high; angle is physical up (manager applies pitch_sign).
