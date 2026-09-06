@@ -1,0 +1,5 @@
+syntax = "proto3";
+message DeployModeStatusSync {
+    optional uint32 status = 1;
+}
+

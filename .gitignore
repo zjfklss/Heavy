@@ -4,3 +4,6 @@ log/
 __pycache__/
 *.pyc
 .colcon/
+
+# 自定义客户端超分 venv（约 7.2G，永不提交）
+vendor/custom_client/linuxideo/sr/

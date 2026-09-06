@@ -1,0 +1,4 @@
+syntax = "proto3";
+message CustomControl { 
+    optional bytes data = 1;
+}

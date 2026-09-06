@@ -1,0 +1,6 @@
+母本：jlcv@192.168.8.1:~/jlauto-aim/{linuxsender1,linuxideo}
+排除：linuxideo/sr/（约 7.2G 超分 venv，不进 git）
+6178ff277cfa3dfe98439de63386f410e89d4fb7
+origin	git@gitee.com:winter_raymond/jlauto-aim.git (fetch)
+origin	git@gitee.com:winter_raymond/jlauto-aim.git (push)
+拷贝时间：2026-09-07T00:46:09+08:00

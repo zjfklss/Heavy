@@ -31,4 +31,4 @@ ros2 launch heavy_lob_shot dry_run.launch.py
 
 干跑日志出现 `DRY_RUN PASS` 且状态到 `READY` 才算第一版 ROS 节点站住。发弹仍等电控联调。
 
-自定义客户端（`192.168.8.1`）本轮未拷进本仓库，不阻塞吊射主链路。
+自定义客户端在 `vendor/custom_client/`（`linuxsender1` + `linuxideo`，已排除约 7.2G 的 `sr/` venv）。说明见该目录 `README.md`。
