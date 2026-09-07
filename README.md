@@ -20,13 +20,13 @@
 python3 /home/jlcv/heavy/tools/demo01_offline_lob_shot.py
 cd /home/jlcv/heavy
 source /opt/ros/jazzy/setup.bash
-PATH="/usr/bin:/opt/ros/jazzy/bin:$PATH" colcon build --symlink-install --packages-up-to heavy_lob_shot --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
+PATH="/usr/bin:/opt/ros/jazzy/bin:$PATH" colcon build --symlink-install --packages-up-to heavy_lob_shot_manager --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
 source /home/jlcv/heavy/install/setup.bash
-ros2 launch heavy_lob_shot dry_run.launch.py
+ros2 launch heavy_lob_shot_manager dry_run.launch.py
 # 仿真（必须 DOMAIN=31，避开实车 Livox）：
 # export ROS_DOMAIN_ID=31
-# ros2 launch heavy_lob_shot rmuc_sim.launch.py
-# ros2 launch heavy_lob_shot rmuc_nav.launch.py
+# ros2 launch heavy_lob_shot_manager rmuc_sim.launch.py
+# ros2 launch heavy_lob_shot_manager rmuc_nav.launch.py
 ```
 
 干跑日志出现 `DRY_RUN PASS` 且状态到 `READY` 才算第一版 ROS 节点站住。发弹仍等电控联调。
