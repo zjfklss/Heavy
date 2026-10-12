@@ -18,7 +18,14 @@
 namespace
 {
 
-lob_shot::Config load_cfg(const std::string & path)
+struct RuntimeIo
+{
+  std::string serial_port = "/dev/ttyUSB0";
+  int baud = 921600;
+  bool deploy = false;
+};
+
+lob_shot::Config load_cfg(const std::string & path, RuntimeIo & io)
 {
   lob_shot::Config c;
   YAML::Node y = YAML::LoadFile(path);
@@ -27,6 +34,9 @@ lob_shot::Config load_cfg(const std::string & path)
   };
   auto getb = [&](const char * k, bool & v) {
     if (y[k]) v = y[k].as<bool>();
+  };
+  auto gets = [&](const char * k, std::string & v) {
+    if (y[k]) v = y[k].as<std::string>();
   };
   getd("target_x", c.target_x);
   getd("target_y", c.target_y);
@@ -57,6 +67,13 @@ lob_shot::Config load_cfg(const std::string & path)
   getd("windmill_radius", c.windmill_radius);
   getd("windmill_z_min", c.windmill_z_min);
   getd("windmill_z_max", c.windmill_z_max);
+  // 英雄硬件：与 jlauto-aim/hero serial_driver.yaml 对齐
+  gets("serial_port", io.serial_port);
+  if (y["device_name"]) io.serial_port = y["device_name"].as<std::string>();
+  if (y["baud"]) io.baud = y["baud"].as<int>();
+  if (y["baud_rate"]) io.baud = y["baud_rate"].as<int>();
+  getb("deploy", io.deploy);
+  getb("deploy_mode_enabled", io.deploy);
   return c;
 }
 
@@ -66,7 +83,6 @@ lob_shot::Command settle(lob_shot::Manager & mgr)
   for (int i = 0; i < 60; ++i) {
     cmd = mgr.tick(0.02);
     if (mgr.state() == lob_shot::State::READY) {
-      // 进入 READY 当帧只瞄准；若已 latch fire，再跑一 tick 才发 z=2
       if (mgr.fire_latched()) cmd = mgr.tick(0.02);
       return cmd;
     }
@@ -76,28 +92,39 @@ lob_shot::Command settle(lob_shot::Manager & mgr)
   return cmd;
 }
 
+void apply_feedback(lob_shot::Manager & mgr, const lob_shot::Feedback & fb)
+{
+  if (!fb.ok) return;
+  mgr.set_feedback(fb.yaw, fb.pitch);
+  if (fb.bullet_speed > 1.0) mgr.set_bullet_speed(fb.bullet_speed);
+}
+
 void log_status(const lob_shot::Manager & m, const lob_shot::Command & cmd)
 {
   const auto sp = lob_shot::gimbal_sp_bytes(cmd);
   tools::logger()->info(
-    "status={} yaw_deg={:.2f} pitch_deg={:.2f} high_unused={:.2f} z={} fire={} gimbal_sp={} yaw_frame=chassis_rel",
+    "status={} yaw_deg={:.2f} pitch_deg={:.2f} high_unused={:.2f} z={} deploy={} fire={} "
+    "gimbal_sp={} yaw_frame=chassis_rel",
     m.status(), m.last_yaw_deg(), m.last_pitch_deg(), m.last_high_deg(), lob_shot::to_z(cmd),
-    m.fire_latched(), lob_shot::to_hex(sp));
+    lob_shot::to_deploy(cmd), m.fire_latched(), lob_shot::to_hex(sp));
 }
 
 }  // namespace
 
 int main(int argc, char ** argv)
 {
+  // 默认串口/波特与英雄 serial_driver.yaml 一致
   const std::string keys =
-    "{help h usage ? | | 重装吊射同济入口 }"
+    "{help h usage ? | | 重装吊射（英雄电控 0xA5/0x5A） }"
     "{@config | configs/heavy_lob.yaml | yaml }"
     "{once | false | 跑到终态退出 }"
     "{fire | false | READY 时开火 }"
     "{undock | false | 模拟未对接 }"
     "{loop | false | 50Hz 循环 }"
     "{dry-run | true | 不写真实串口 }"
-    "{port | /dev/ttyUSB0 | 串口 }";
+    "{deploy | false | 部署模式字节（英雄 deploy_mode_enabled） }"
+    "{port | /dev/ttyUSB0 | 串口 }"
+    "{baud | 921600 | 波特率 }";
 
   cv::CommandLineParser cli(argc, argv, keys);
   if (cli.has("help")) {
@@ -110,25 +137,30 @@ int main(int argc, char ** argv)
   const bool undock = cli.get<bool>("undock");
   const bool loop = cli.get<bool>("loop");
   const bool dry = cli.get<bool>("dry-run");
-  const auto port = cli.get<std::string>("port");
+
+  RuntimeIo io;
+  lob_shot::Config cfg = load_cfg(cfg_path, io);
+  if (cli.has("port")) io.serial_port = cli.get<std::string>("port");
+  if (cli.has("baud")) io.baud = cli.get<int>("baud");
+  if (cli.has("deploy")) io.deploy = cli.get<bool>("deploy");
+  if (undock) cfg.module_docked = false;
 
   tools::Exiter exiter;
   tools::Plotter plotter;
-  lob_shot::Config cfg = load_cfg(cfg_path);
-  if (undock) cfg.module_docked = false;
-
   lob_shot::Manager mgr(cfg);
   std::unique_ptr<lob_shot::ISender> sender;
   if (dry) {
     sender = std::make_unique<lob_shot::DrySender>();
     tools::logger()->info("sender=DrySender (no hardware)");
   } else {
-    auto ser = std::make_unique<lob_shot::SerialSender>(port);
+    auto ser = std::make_unique<lob_shot::SerialSender>(io.serial_port, io.baud);
     if (!ser->open()) {
-      tools::logger()->error("open serial {} failed; fallback DrySender", port);
+      tools::logger()->error(
+        "open serial {} @{} failed; fallback DrySender", io.serial_port, io.baud);
       sender = std::make_unique<lob_shot::DrySender>();
     } else {
-      tools::logger()->info("sender=SerialSender {}", port);
+      tools::logger()->info(
+        "sender=SerialSender {} @{} (hero 0xA5/0x5A)", io.serial_port, io.baud);
       sender = std::move(ser);
     }
   }
@@ -136,18 +168,20 @@ int main(int argc, char ** argv)
   mgr.request_trigger();
   if (do_fire) mgr.set_fire(true);
 
+  auto stamp_deploy = [&](lob_shot::Command & cmd) { cmd.deploy = io.deploy; };
+
   if (loop) {
     while (!exiter.exit()) {
-      double fy = 0, fp = 0;
-      if (sender->read_feedback(fy, fp)) mgr.set_feedback(fy, fp);
+      apply_feedback(mgr, sender->read_feedback());
       auto cmd = mgr.tick(0.02);
-      // 每拍都发：IDLE/失败时 z=0，避免电控停在上一帧 z=1/2
+      stamp_deploy(cmd);
       sender->send(cmd);
       nlohmann::json j = {
         {"status", mgr.status()},
         {"yaw_deg", mgr.last_yaw_deg()},
         {"pitch_deg", mgr.last_pitch_deg()},
         {"z", lob_shot::to_z(cmd)},
+        {"deploy", lob_shot::to_deploy(cmd)},
       };
       plotter.plot(j);
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -156,6 +190,7 @@ int main(int argc, char ** argv)
   }
 
   auto cmd = settle(mgr);
+  stamp_deploy(cmd);
   sender->send(cmd);
   log_status(mgr, cmd);
 

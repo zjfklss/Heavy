@@ -96,7 +96,25 @@ int main()
   mf.set_fire(true);
   if (lob_shot::to_z(settle(mf)) != 2) return fail("fire z");
 
+  // 英雄 0x5A 布局 + CRC（与 jlcv_serial_driver ReceivePacket 同构）
+  if (sizeof(lob_shot::ReceivePacket5A) != 16) return fail("5a sizeof");
+  lob_shot::ReceivePacket5A fake{};
+  fake.header = 0x5A;
+  fake.curr_pitch = 0.1f;
+  fake.curr_yaw = 0.2f;
+  fake.bullet_speed = 16.5f;
+  const uint16_t crc = tools::get_crc16(reinterpret_cast<uint8_t *>(&fake), 14);
+  fake.checksum = crc;
+  lob_shot::ReceivePacket5A parsed{};
+  if (!lob_shot::decode_5a(reinterpret_cast<uint8_t *>(&fake), sizeof(fake), parsed))
+    return fail("5a decode");
+  if (!near(parsed.curr_yaw, 0.2, 1e-5) || !near(parsed.bullet_speed, 16.5, 1e-5))
+    return fail("5a fields");
+
+  auto a5d = lob_shot::encode_a5(0.1f, 0.2f, 1, 1);
+  if (a5d.size() != 13 || a5d[10] != 1) return fail("a5 deploy");
+
   std::cout << "heavy_lob_offline_test PASS pitch=" << mgr.last_pitch_deg()
-            << " a5_crc_ok gimbal_sp_crc_ok\n";
+            << " a5_crc_ok gimbal_sp_crc_ok hero_5a_ok\n";
   return 0;
 }

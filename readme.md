@@ -206,13 +206,13 @@ tests/heavy_lob_offline_test.cpp          离线测试
 | `--dry-run` | 默认 true，只打印报文 |
 | `--port` | 串口，默认 `/dev/ttyUSB0` |
 
-实车循环：
+实车循环（串口约定对齐英雄 `jlcv_serial_driver`：`/dev/ttyUSB0` @ 921600，下发 0xA5，回传 0x5A）：
 
 ```bash
 ./build_lob/heavy_lob configs/heavy_lob_robot.yaml --loop --dry-run=false --port=/dev/ttyUSB0
 ```
 
-串口打不开会退回 `DrySender`，日志里能看到。
+`--deploy=true` 把 0xA5 的 deploy 位置 1（英雄部署模式）。回传弹速 >1 时会写进解算。串口打不开会退回 `DrySender`。
 
 `--once` 的退出码：到达预期终态为 0。没到 `READY`、开火后不是 `z=2`、或未对接时没有被抑制，返回非 0。
 
