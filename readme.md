@@ -166,11 +166,12 @@ tasks/lob_shot/projectile_motion/         弹道
 tasks/lob_shot/a5_packet.cpp              0xA5 下发 / 0x5A 回传解码
 tasks/lob_shot/gimbal_adapter.hpp         同济云台 SP 帧
 tasks/lob_shot/lob_serial.cpp             DrySender / SerialSender（英雄 ttyUSB0@921600）
-calibration/                              内参 + 两套手眼（迁自英雄 handeye_calibration）
+calibration/                              小圆点板内参 + 两套手眼（检测器复用）
 configs/heavy_lob.yaml                    开环验收，门闩打开
 configs/heavy_lob_robot.yaml              实车默认，门闩关闭；串口/波特率/deploy
-configs/calibration_hero.yaml             英雄板 7×7@25mm + 云台轴偏置
-configs/camera_info.yaml                  英雄内参（ROS camera_info）
+configs/calibration.yaml                  主标定配置（7×7@25mm）
+configs/camera_info.yaml                  内参（ROS camera_info）
+docs/圆点标定操作流程.md                   标定逐步手册
 tests/heavy_lob_offline_test.cpp          离线测试（含 hero_5a_ok）
 ```
 
@@ -364,63 +365,33 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 
 ## 六、相机标定（上车感知前必做）
 
-吊射入口 `HEAVY_LOB_ONLY` **运行时不读相机**，但已附带三套离线标定程序。采图 `capture` 仍需全量编译（相机 SDK）。结果给 `tasks/auto_aim/solver.cpp`、`tasks/auto_buff/buff_solver.cpp`。
+**主路径：英雄对称小圆点板 7×7 @ 25mm。** 无 ROS。逐步操作见：
 
-本段已按远程英雄 `jlauto-aim/hero/src/handeye_calibration` 定制：独立 `camera_info.yaml`、云台轴偏置、blob 圆点检测、两套手眼、串口姿态采图。**无 ROS。**
+**[docs/圆点标定操作流程.md](docs/圆点标定操作流程.md)**
 
-#### 1. 编译与标定板
+吊射 `HEAVY_LOB_ONLY` 运行时不读相机，但已编三套离线解算；采图 `capture` 需全量编译（相机 SDK）。结果给 `solver` / `buff_solver`。
+
+| 配置 | 用途 |
+| --- | --- |
+| `configs/calibration.yaml` | **主配置**（7×7@25 + 轴偏置 + blob） |
+| `configs/camera_info.yaml` | 内参（ROS 格式） |
+| `configs/calibration_hero.yaml` | 与主配置同内容的别名 |
+| `configs/calibration_legacy_10x7.yaml` | 旧同济大板旁路 |
 
 ```bash
-# 离线标定（HEAVY_LOB_ONLY 已含）
+# 离线
 cmake -B build_lob -DHEAVY_LOB_ONLY=ON && cmake --build build_lob -j$(nproc) \
   --target calibrate_camera calibrate_handeye calibrate_robotworld_handeye
-
-# 采图需全量（相机 SDK）
+# 采图（全量）
 cmake -B build && cmake --build build -j$(nproc) --target capture
-```
 
-| 配置 | 板 | 云台偏置 |
-| --- | --- | --- |
-| `configs/calibration.yaml` | 10×7 @ 40 mm（同济默认） | 默认全 0 |
-| `configs/calibration_hero.yaml` | 7×7 @ 25 mm（远程英雄） | `p_yaw_to_pitch_mm: [62.11, 0, 151.32]` |
-| `configs/camera_info.yaml` | — | 远程英雄内参（ROS 格式） |
-
-板是**对称圆点阵**。`capture` 从 yaml 读行列数，勿再改死代码。
-
-#### 2. 内参
-
-1. 采图（全量 `build`，需相机 SDK）：
-   - 同济 CAN：`./build/capture --config-path=configs/calibration.yaml --output-folder=assets/img_with_q`
-   - 英雄串口：`./build/capture --config-path=configs/calibration_hero.yaml --output-folder=assets/img_with_q --attitude=serial`
-2. 标定：`./build_lob/calibrate_camera assets/img_with_q --config-path=configs/calibration.yaml`  
-   同时打印扁平字段与 ROS `camera_info`；默认写 `configs/camera_info.yaml`，可用 `--output=` 写扁平文件。固定 K3。  
-   （OpenCV CLI 请用 `--key=value`，`-c path` 空格形式会把 path 吃成 bool。）
-3. 扁平结果粘到任务 yaml，**并**保留 `camera_info.yaml` 供手眼 `--camera-info=`。
-
-#### 3. 手眼外参（两套）
-
-输入：成对 `N.jpg` + `N.txt`（四元数 **wxyz**）。内参优先 `--camera-info`，否则读 config 里扁平字段。
-
-| 程序 | 何时用 | 原理 |
-| --- | --- | --- |
-| `calibrate_handeye` | 板固定、云台大范围转；默认 | `cv::calibrateHandEye` |
-| `calibrate_robotworld_handeye` | 还要解板世界位姿交叉验证（英雄主用） | `cv::calibrateRobotWorldHandEye` + 竖直板模型 |
-
-英雄用法示例：
-
-```bash
+./build/capture --config-path=configs/calibration.yaml \
+  --output-folder=assets/img_with_q --attitude=serial
+./build_lob/calibrate_camera assets/img_with_q \
+  --config-path=configs/calibration.yaml --camera-info=configs/camera_info.yaml --preview=auto
 ./build_lob/calibrate_robotworld_handeye assets/img_with_q \
-  --config-path=configs/calibration_hero.yaml \
-  --camera-info=configs/camera_info.yaml \
-  --output=configs/calibration_result.yaml
+  --config-path=configs/calibration.yaml --camera-info=configs/camera_info.yaml \
+  --output=configs/calibration_result.yaml --preview=auto
 ```
 
-`p_yaw_to_pitch_mm` / `p_pitch_to_barrel_mm` 建模 yaw/pitch 轴不共点；共点云台保持零。重投影超 `--reproj-max`（默认 1 px）的帧会被丢掉。
-
-#### 4. 常见坑
-
-1. USB3：先跑 MVS `set_usbfs_*`，掉帧会导致图与姿态错位。
-2. 标定板贴硬平面；`center_distance_mm` 必须真实。
-3. 手眼：yaw 与 pitch 都要大范围转。先看弹窗叠的 yaw/pitch，方向不对先改 `R_gimbal2imubody`。
-4. 内参单位 mm，手眼平移输出已是 m。
-5. 参考结果：`configs/calibration_result_hero_ref.yaml`（远程实测，勿直接当本车外参）。
+手眼主路径为 `calibrate_robotworld_handeye`；`calibrate_handeye` 为辅。CLI 用 `--key=value`。性能：blob 复用、采图预览半分辨率检测、默认 `--preview=auto`。

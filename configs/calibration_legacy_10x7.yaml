@@ -1,0 +1,29 @@
+# 旧同济大板（旁路，非主路径）
+pattern_cols: 10
+pattern_rows: 7
+center_distance_mm: 40
+
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+p_yaw_to_pitch_mm: [0.0, 0.0, 0.0]
+p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]
+
+blob_min_area: 20
+blob_max_area: 5000
+blob_min_circularity: 0.6
+blob_color: 0
+detect_scale: 0.5
+jpeg_quality: 92
+reproj_max_px: 1.0
+
+camera_name: "hikrobot"
+exposure_ms: 3
+gain: 10.0
+vid_pid: "2bdf:0001"
+
+quaternion_canid: 0x01
+bullet_speed_canid: 0x110
+send_canid: 0xff
+can_interface: "can0"
+
+serial_port: /dev/ttyUSB0
+baud: 921600

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 #include <opencv2/opencv.hpp>
+#include <vector>
 
 #include "calibration/calib_common.hpp"
 #include "io/camera.hpp"
@@ -16,11 +17,12 @@
 
 const std::string keys =
   "{help h usage ?  |                          | 输出命令行参数说明}"
-  "{@config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
-  "{output-folder o |      assets/img_with_q   | 输出文件夹路径   }"
-  "{attitude a      | can                      | 姿态源: can | serial }"
+  "{config-path c   | configs/calibration.yaml | yaml配置文件路径 }"
+  "{output-folder o | assets/img_with_q        | 输出文件夹路径   }"
+  "{attitude a      | serial                   | 姿态源: serial | can }"
   "{port            | /dev/ttyUSB0             | serial 时串口 }"
-  "{baud            | 921600                   | serial 时波特率 }";
+  "{baud            | 921600                   | serial 时波特率 }"
+  "{require-board   | 1                        | 1=保存前全分辨率复检圆点 }";
 
 void write_q(const std::string & q_path, const Eigen::Quaterniond & q)
 {
@@ -29,7 +31,6 @@ void write_q(const std::string & q_path, const Eigen::Quaterniond & q)
   q_file << fmt::format("{} {} {} {}", xyzw[3], xyzw[0], xyzw[1], xyzw[2]);
 }
 
-// 英雄关节态：yaw/pitch(rad)、roll=0 → 四元数
 Eigen::Quaterniond ypr_to_q(double yaw, double pitch, double roll = 0)
 {
   return Eigen::Quaterniond(
@@ -40,13 +41,12 @@ Eigen::Quaterniond ypr_to_q(double yaw, double pitch, double roll = 0)
 
 void capture_loop(
   const std::string & config_path, const std::string & output_folder, const std::string & attitude,
-  std::string port, int baud)
+  std::string port, int baud, bool require_board)
 {
-  auto yaml = YAML::LoadFile(config_path);
-  int pattern_cols = yaml["pattern_cols"] ? yaml["pattern_cols"].as<int>() : 10;
-  int pattern_rows = yaml["pattern_rows"] ? yaml["pattern_rows"].as<int>() : 7;
-  cv::Size pattern_size(pattern_cols, pattern_rows);
+  auto board = calib::load_board_config(config_path);
+  calib::CircleGridDetector detector(board);
 
+  auto yaml = YAML::LoadFile(config_path);
   if (yaml["serial_port"]) port = yaml["serial_port"].as<std::string>();
   if (yaml["device_name"]) port = yaml["device_name"].as<std::string>();
   if (yaml["baud"]) baud = yaml["baud"].as<int>();
@@ -67,11 +67,16 @@ void capture_loop(
     tools::logger()->info("attitude=can (CBoard IMU quaternion)");
   }
 
-  tools::logger()->info("标定板尺寸 {}x{}", pattern_cols, pattern_rows);
+  tools::logger()->info(
+    "小圆点板 {}x{} @ {:.1f}mm；预览 detect_scale={:.2f}", board.pattern_cols, board.pattern_rows,
+    board.center_distance_mm, board.detect_scale);
 
+  std::vector<int> jpeg_params = {cv::IMWRITE_JPEG_QUALITY, board.jpeg_quality};
   cv::Mat img;
   std::chrono::steady_clock::time_point timestamp;
   int count = 0;
+  std::vector<cv::Point2f> centers_preview;
+
   while (true) {
     camera.read(img, timestamp);
 
@@ -92,25 +97,41 @@ void capture_loop(
       roll_deg = zyx[2];
     }
 
-    auto img_with_ypr = img.clone();
-    tools::draw_text(img_with_ypr, fmt::format("yaw   {:.2f}", yaw_deg), {40, 40}, {0, 0, 255});
-    tools::draw_text(img_with_ypr, fmt::format("pitch {:.2f}", pitch_deg), {40, 80}, {0, 0, 255});
-    tools::draw_text(img_with_ypr, fmt::format("roll  {:.2f}", roll_deg), {40, 120}, {0, 0, 255});
+    // 预览：降采样检测，避免每帧全分辨率 findCirclesGrid
+    bool preview_ok = detector.detect(img, centers_preview, false);
 
-    std::vector<cv::Point2f> centers_2d;
-    auto success = calib::find_circle_grid(img, pattern_size, centers_2d);
-    cv::drawChessboardCorners(img_with_ypr, pattern_size, centers_2d, success);
-    cv::resize(img_with_ypr, img_with_ypr, {}, 0.5, 0.5);
+    cv::Mat preview;
+    cv::resize(img, preview, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
+    std::vector<cv::Point2f> draw_pts = centers_preview;
+    for (auto & p : draw_pts) {
+      p.x *= 0.5f;
+      p.y *= 0.5f;
+    }
+    tools::draw_text(preview, fmt::format("yaw   {:.2f}", yaw_deg), {40, 40}, {0, 0, 255});
+    tools::draw_text(preview, fmt::format("pitch {:.2f}", pitch_deg), {40, 80}, {0, 0, 255});
+    tools::draw_text(preview, fmt::format("roll  {:.2f}", roll_deg), {40, 120}, {0, 0, 255});
+    tools::draw_text(
+      preview, fmt::format("board {}  n={}", preview_ok ? "OK" : "--", count), {40, 160},
+      preview_ok ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255));
+    cv::drawChessboardCorners(preview, board.pattern_size(), draw_pts, preview_ok);
 
-    cv::imshow("Press s to save, q to quit", img_with_ypr);
+    cv::imshow("s=save q=quit (small circle board)", preview);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
     if (key != 's') continue;
 
+    if (require_board) {
+      std::vector<cv::Point2f> full;
+      if (!detector.detect(img, full, true)) {
+        tools::logger()->warn("全分辨率未检出圆点，未保存");
+        continue;
+      }
+    }
+
     count++;
     auto img_path = fmt::format("{}/{}.jpg", output_folder, count);
     auto q_path = fmt::format("{}/{}.txt", output_folder, count);
-    cv::imwrite(img_path, img);
+    cv::imwrite(img_path, img, jpeg_params);
     write_q(q_path, q);
     tools::logger()->info(
       "[{}] Saved yaw={:.2f} pitch={:.2f} -> {}", count, yaw_deg, pitch_deg, output_folder);
@@ -124,14 +145,15 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
-  auto config_path = cli.get<std::string>(0);
+  auto config_path = cli.get<std::string>("config-path");
   auto output_folder = cli.get<std::string>("output-folder");
   auto attitude = cli.get<std::string>("attitude");
   auto port = cli.get<std::string>("port");
   auto baud = cli.get<int>("baud");
+  bool require_board = cli.get<int>("require-board") != 0;
 
   std::filesystem::create_directories(output_folder);
-  capture_loop(config_path, output_folder, attitude, port, baud);
+  capture_loop(config_path, output_folder, attitude, port, baud, require_board);
   tools::logger()->warn("注意四元数输出顺序为 wxyz");
   return 0;
 }

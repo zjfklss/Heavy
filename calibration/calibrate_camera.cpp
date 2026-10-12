@@ -1,51 +1,16 @@
 #include <fmt/core.h>
-#include <yaml-cpp/yaml.h>
 
 #include <opencv2/opencv.hpp>
 
 #include "calibration/calib_common.hpp"
-#include "tools/img_tools.hpp"
 
 const std::string keys =
   "{help h usage ? |                          | 输出命令行参数说明}"
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
   "{output o       | none                     | 扁平内参输出路径；none=不写 }"
   "{camera-info i  | configs/camera_info.yaml | ROS camera_info 输出路径 }"
+  "{preview p      | auto                     | auto|manual|none }"
   "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
-
-void load(
-  const std::string & input_folder, const std::string & config_path, cv::Size & img_size,
-  std::vector<std::vector<cv::Point3f>> & obj_points,
-  std::vector<std::vector<cv::Point2f>> & img_points)
-{
-  auto yaml = YAML::LoadFile(config_path);
-  auto pattern_cols = yaml["pattern_cols"].as<int>();
-  auto pattern_rows = yaml["pattern_rows"].as<int>();
-  auto center_distance_mm = yaml["center_distance_mm"].as<double>();
-  cv::Size pattern_size(pattern_cols, pattern_rows);
-
-  for (int i = 1; true; i++) {
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto img = cv::imread(img_path);
-    if (img.empty()) break;
-
-    img_size = img.size();
-    std::vector<cv::Point2f> centers_2d;
-    auto success = calib::find_circle_grid(img, pattern_size, centers_2d);
-
-    auto drawing = img.clone();
-    cv::drawChessboardCorners(drawing, pattern_size, centers_2d, success);
-    cv::resize(drawing, drawing, {}, 0.5, 0.5);
-    cv::imshow("Press any to continue", drawing);
-    cv::waitKey(0);
-
-    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path);
-    if (!success) continue;
-
-    img_points.emplace_back(centers_2d);
-    obj_points.emplace_back(calib::centers_3d_planar(pattern_size, center_distance_mm));
-  }
-}
 
 int main(int argc, char * argv[])
 {
@@ -56,15 +21,42 @@ int main(int argc, char * argv[])
   }
   auto input_folder = cli.get<std::string>(0);
   auto config_path = cli.get<std::string>("config-path");
-  auto output_flat = cli.get<std::string>("output");
-  if (output_flat == "none" || output_flat == "true") output_flat.clear();
-  auto output_ros = cli.get<std::string>("camera-info");
-  if (output_ros == "none" || output_ros == "true") output_ros.clear();
+  auto output_flat = calib::cli_str(cli, "output");
+  auto output_ros = calib::cli_str(cli, "camera-info");
+  auto preview = calib::parse_preview(cli.get<std::string>("preview"));
+
+  auto board = calib::load_board_config(config_path);
+  calib::CircleGridDetector detector(board);
+  auto obj_template = calib::centers_3d_planar(board);
+
+  fmt::print(
+    "小圆点板 {}x{} @ {:.1f}mm；preview={}\n", board.pattern_cols, board.pattern_rows,
+    board.center_distance_mm,
+    preview == calib::PreviewMode::None     ? "none"
+    : preview == calib::PreviewMode::Manual ? "manual"
+                                              : "auto");
 
   cv::Size img_size;
   std::vector<std::vector<cv::Point3f>> obj_points;
   std::vector<std::vector<cv::Point2f>> img_points;
-  load(input_folder, config_path, img_size, obj_points, img_points);
+
+  for (int i = 1; true; i++) {
+    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
+    auto img = cv::imread(img_path);
+    if (img.empty()) break;
+    img_size = img.size();
+
+    std::vector<cv::Point2f> centers;
+    bool ok = detector.detect(img, centers, true);
+    calib::show_preview(
+      preview, img, board.pattern_size(), centers, ok, "calibrate_camera (q skips window focus)");
+    fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);
+    if (!ok) continue;
+
+    img_points.emplace_back(std::move(centers));
+    obj_points.emplace_back(obj_template);
+  }
+
   if (obj_points.empty()) {
     fmt::print(stderr, "无有效内参样本\n");
     return 1;
@@ -81,12 +73,12 @@ int main(int argc, char * argv[])
   double error_sum = 0;
   size_t total_points = 0;
   for (size_t i = 0; i < obj_points.size(); i++) {
-    std::vector<cv::Point2f> reprojected_points;
+    std::vector<cv::Point2f> reprojected;
     cv::projectPoints(
-      obj_points[i], rvecs[i], tvecs[i], camera_matrix, distort_coeffs, reprojected_points);
-    total_points += reprojected_points.size();
-    for (size_t j = 0; j < reprojected_points.size(); j++)
-      error_sum += cv::norm(img_points[i][j] - reprojected_points[j]);
+      obj_points[i], rvecs[i], tvecs[i], camera_matrix, distort_coeffs, reprojected);
+    total_points += reprojected.size();
+    for (size_t j = 0; j < reprojected.size(); j++)
+      error_sum += cv::norm(img_points[i][j] - reprojected[j]);
   }
   auto error = error_sum / total_points;
 

@@ -1,13 +1,24 @@
-# 同济默认标定板；英雄板见 calibration_hero.yaml
-pattern_cols: 10
+# 主路径：英雄对称小圆点板 7×7 @ 25mm（白底黑点）
+# 大板见 calibration_legacy_10x7.yaml
+
+pattern_cols: 7
 pattern_rows: 7
-center_distance_mm: 40
+center_distance_mm: 25.0
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# 英雄云台：yaw/pitch 轴不共点（mm）。共点云台保持 [0,0,0]
-p_yaw_to_pitch_mm: [0.0, 0.0, 0.0]
+# yaw轴中心 -> pitch轴中心（mm，X前 Y左 Z上）；共点云台保持全 0
+p_yaw_to_pitch_mm: [62.11, 0.0, 151.32]
 p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]
+
+# 圆点检测（小点优先调 min/max area）
+blob_min_area: 10
+blob_max_area: 3000
+blob_min_circularity: 0.6
+blob_color: 0
+detect_scale: 0.5
+jpeg_quality: 92
+reproj_max_px: 1.0
 
 camera_name: "hikrobot"
 exposure_ms: 3
@@ -20,10 +31,9 @@ bullet_speed_canid: 0x110
 send_canid: 0xff
 can_interface: "can0"
 
-# 内参：跑完 calibrate_camera 后粘扁平字段到此，或手眼时用 --camera-info
-# camera_matrix: [...]
-# distort_coeffs: [...]
-
-# 英雄串口采图（--attitude=serial）可覆盖
 serial_port: /dev/ttyUSB0
 baud: 921600
+
+# 内参：优先 --camera-info=configs/camera_info.yaml；none 时用下面扁平字段
+camera_matrix: [3546.58523, 0.0, 730.97855, 0.0, 3545.36711, 572.93391, 0.0, 0.0, 1.0]
+distort_coeffs: [-0.017987, -0.454369, 0.000994, -0.000664, 0.0]
