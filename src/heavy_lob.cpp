@@ -65,9 +65,12 @@ lob_shot::Command settle(lob_shot::Manager & mgr)
   lob_shot::Command cmd;
   for (int i = 0; i < 60; ++i) {
     cmd = mgr.tick(0.02);
-    if (mgr.state() == lob_shot::State::READY || mgr.state() == lob_shot::State::INHIBITED) {
+    if (mgr.state() == lob_shot::State::READY) {
+      // 进入 READY 当帧只瞄准；若已 latch fire，再跑一 tick 才发 z=2
+      if (mgr.fire_latched()) cmd = mgr.tick(0.02);
       return cmd;
     }
+    if (mgr.state() == lob_shot::State::INHIBITED) return cmd;
     if (mgr.status().rfind("IDLE (", 0) == 0) return cmd;
   }
   return cmd;
@@ -138,7 +141,8 @@ int main(int argc, char ** argv)
       double fy = 0, fp = 0;
       if (sender->read_feedback(fy, fp)) mgr.set_feedback(fy, fp);
       auto cmd = mgr.tick(0.02);
-      if (cmd.control || mgr.state() == lob_shot::State::INHIBITED) sender->send(cmd);
+      // 每拍都发：IDLE/失败时 z=0，避免电控停在上一帧 z=1/2
+      sender->send(cmd);
       nlohmann::json j = {
         {"status", mgr.status()},
         {"yaw_deg", mgr.last_yaw_deg()},

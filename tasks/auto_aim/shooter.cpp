@@ -22,21 +22,25 @@ bool Shooter::shoot(
 {
   if (!command.control || targets.empty() || !auto_fire_) return false;
 
-  // 钉头模式已在 Aimer 按预测窗口置 shoot；勿再用「跟上跟踪指令」覆盖
-  if (command.shoot && aimer.nail_mode() && aimer.nail_latched()) {
-    last_command_ = command;
-    return true;
-  }
-
   auto target_x = targets.front().ekf_x()[0];
   auto target_y = targets.front().ekf_x()[2];
   auto tolerance = std::sqrt(tools::square(target_x) + tools::square(target_y)) > judge_distance_
                      ? second_tolerance_
                      : first_tolerance_;
-  // tools::logger()->debug("d(command.yaw) is {:.4f}", std::abs(last_command_.yaw - command.yaw));
+
+  // 钉头：Aimer 已按预测窗口置 shoot，但仍须云台 yaw 贴近钉头指令（保护重装电机、避免未到位开火）
+  if (command.shoot && aimer.nail_mode() && aimer.nail_latched()) {
+    if (std::abs(tools::limit_rad(gimbal_pos[0] - command.yaw)) < tolerance) {
+      last_command_ = command;
+      return true;
+    }
+    last_command_ = command;
+    return false;
+  }
+
   if (
-    std::abs(last_command_.yaw - command.yaw) < tolerance * 2 &&  //此时认为command突变不应该射击
-    std::abs(gimbal_pos[0] - last_command_.yaw) < tolerance &&    //应该减去上一次command的yaw值
+    std::abs(tools::limit_rad(last_command_.yaw - command.yaw)) < tolerance * 2 &&
+    std::abs(tools::limit_rad(gimbal_pos[0] - last_command_.yaw)) < tolerance &&
     aimer.debug_aim_point.valid) {
     last_command_ = command;
     return true;

@@ -41,7 +41,8 @@ inline GimbalSpFrame to_gimbal_sp(const Command & cmd)
   GimbalSpFrame f;
   f.mode = to_gimbal_mode(cmd);
   f.yaw = static_cast<float>(cmd.yaw);
-  f.pitch = static_cast<float>(cmd.pitch);
+  // lob Command::pitch 抬头为正；同济 SP / Planner 抬头为负
+  f.pitch = static_cast<float>(-cmd.pitch);
   f.crc16 = tools::get_crc16(
     reinterpret_cast<uint8_t *>(&f), sizeof(f) - sizeof(f.crc16));
   return f;

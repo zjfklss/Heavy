@@ -15,7 +15,12 @@ constexpr double kPi = 3.14159265358979323846;
 
 Manager::Manager(Config cfg) : cfg_(cfg) {}
 
-void Manager::request_trigger() { trigger_pending_ = true; }
+void Manager::request_trigger()
+{
+  // 门闩未开时不接受触发，避免恢复后自动瞄准/开火
+  if (!gate_ok()) return;
+  trigger_pending_ = true;
+}
 
 void Manager::request_cancel()
 {
@@ -25,7 +30,11 @@ void Manager::request_cancel()
   }
 }
 
-void Manager::set_fire(bool on) { fire_ = on; }
+void Manager::set_fire(bool on)
+{
+  if (on && !gate_ok()) return;
+  fire_ = on;
+}
 
 void Manager::set_gate(bool unlocked, bool docked, bool assembling)
 {
@@ -38,6 +47,7 @@ void Manager::set_feedback(double yaw, double pitch)
 {
   fb_yaw_ = yaw;
   fb_pitch_ = pitch;
+  fb_ok_ = true;
 }
 
 void Manager::set_bullet_speed(double v)
@@ -185,7 +195,8 @@ Command Manager::tick(double dt_s)
       cmd.yaw = target_yaw_;
       cmd.pitch = fb_pitch_;
       const double ey = wrap_pi(fb_yaw_ - target_yaw_);
-      if (cfg_.open_loop || std::fabs(ey) < cfg_.yaw_tol) {
+      // 闭环必须先收到反馈，否则 fb=0 会误判收敛
+      if (cfg_.open_loop || (fb_ok_ && std::fabs(ey) < cfg_.yaw_tol)) {
         set_state(State::PITCH_AIMING, "PITCH_AIMING");
       } else if (t_in_state_ > cfg_.aim_timeout_s) {
         set_state(State::IDLE, "IDLE (yaw timeout)");
@@ -206,9 +217,10 @@ Command Manager::tick(double dt_s)
       cmd.control = true;
       cmd.yaw = target_yaw_;
       cmd.pitch = target_pitch_;
-      if (cfg_.open_loop || std::fabs(fb_pitch_ - target_pitch_) < cfg_.pitch_tol) {
+      // 进入 READY 当帧只瞄准（z=1）；开火留给下一 tick 的 READY 分支（对齐 Heavy）
+      if (cfg_.open_loop || (fb_ok_ && std::fabs(fb_pitch_ - target_pitch_) < cfg_.pitch_tol)) {
         set_state(State::READY, "READY");
-        cmd.shoot = fire_;
+        cmd.shoot = false;
       } else if (t_in_state_ > cfg_.aim_timeout_s) {
         set_state(State::IDLE, "IDLE (pitch timeout)");
         clear_aim_request();
@@ -217,9 +229,10 @@ Command Manager::tick(double dt_s)
       break;
     }
     case State::READY:
-      // READY 再来 trigger → 重新解算（对齐 Heavy）
+      // READY 再来 trigger → 重新解算，并清 fire，禁止带着旧开火请求自动打
       if (trigger_pending_) {
         trigger_pending_ = false;
+        fire_ = false;
         set_state(State::WAITING_POSE, "WAITING_POSE");
         break;
       }

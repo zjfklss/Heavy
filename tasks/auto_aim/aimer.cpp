@@ -130,7 +130,7 @@ io::Command Aimer::aim_track(
   }
 
   Eigen::Vector3d final_xyz = debug_aim_point.xyza.head(3);
-  double yaw = std::atan2(final_xyz.y(), final_xyz.x()) + yaw_offset_;
+  double yaw = tools::limit_rad(std::atan2(final_xyz.y(), final_xyz.x()) + yaw_offset_);
   double pitch = -(current_traj.pitch + pitch_offset_);
   return {true, false, yaw, pitch};
 }
@@ -200,7 +200,7 @@ io::Command Aimer::aim_nail(
   }
 
   debug_aim_point = {true, best_xyza};
-  const double yaw_cmd = std::atan2(yc, xc) + yaw_offset_;
+  const double yaw_cmd = tools::limit_rad(std::atan2(yc, xc) + yaw_offset_);
   const double pitch_cmd = -(current_traj.pitch + pitch_offset_);
   const bool shoot = min_diff < nail_fire_window_;
 

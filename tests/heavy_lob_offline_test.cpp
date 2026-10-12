@@ -22,7 +22,11 @@ lob_shot::Command settle(lob_shot::Manager & m)
   lob_shot::Command c;
   for (int i = 0; i < 60; ++i) {
     c = m.tick(0.02);
-    if (m.state() == lob_shot::State::READY || m.state() == lob_shot::State::INHIBITED) return c;
+    if (m.state() == lob_shot::State::READY) {
+      if (m.fire_latched()) c = m.tick(0.02);
+      return c;
+    }
+    if (m.state() == lob_shot::State::INHIBITED) return c;
     if (m.status().rfind("IDLE (", 0) == 0) return c;
   }
   return c;

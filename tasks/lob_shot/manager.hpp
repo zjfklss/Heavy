@@ -105,6 +105,7 @@ private:
   double t_in_state_ = 0;
   double fb_yaw_ = 0;
   double fb_pitch_ = 0;
+  bool fb_ok_ = false;  // 未收到反馈前闭环不算收敛
   double target_yaw_ = 0;    // 相对底盘
   double target_yaw_map_ = 0;
   double target_pitch_ = 0;
