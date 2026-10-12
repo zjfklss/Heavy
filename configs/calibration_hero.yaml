@@ -1,0 +1,29 @@
+# 远程英雄 handeye_calibration 本机参数（jlauto-aim/hero）
+# 板：7x7 @ 25mm；云台偏置来自实测；内参见 camera_info.yaml
+
+pattern_cols: 7
+pattern_rows: 7
+center_distance_mm: 25.0
+
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+# yaw轴中心 -> pitch轴中心（mm，X前 Y左 Z上）
+p_yaw_to_pitch_mm: [62.11, 0.0, 151.32]
+p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]
+
+camera_name: "hikrobot"
+exposure_ms: 3
+gain: 10.0
+vid_pid: "2bdf:0001"
+
+quaternion_canid: 0x01
+bullet_speed_canid: 0x110
+send_canid: 0xff
+can_interface: "can0"
+
+serial_port: /dev/ttyUSB0
+baud: 921600
+
+# 与 camera_info.yaml 同步的扁平内参（--camera-info=none 时用）
+camera_matrix: [3546.58523, 0.0, 730.97855, 0.0, 3545.36711, 572.93391, 0.0, 0.0, 1.0]
+distort_coeffs: [-0.017987, -0.454369, 0.000994, -0.000664, 0.0]

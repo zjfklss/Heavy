@@ -48,6 +48,16 @@ if(HEAVY_LOB_ONLY)
     ${PROJECT_SOURCE_DIR} ${EIGEN3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
   target_link_libraries(nail_aimer_offline_test PRIVATE
     yaml-cpp fmt::fmt spdlog::spdlog ${OpenCV_LIBS})
+
+  # 标定离线解算（无相机/无 ROS）；采图仍需全量 build 的 capture
+  add_library(tools_calib OBJECT tools/img_tools.cpp tools/math_tools.cpp tools/logger.cpp)
+  target_include_directories(tools_calib PUBLIC
+    ${PROJECT_SOURCE_DIR} ${EIGEN3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS} ${NLOHMANN_JSON_INC})
+  foreach(tgt calibrate_camera calibrate_handeye calibrate_robotworld_handeye)
+    add_executable(${tgt} calibration/${tgt}.cpp $<TARGET_OBJECTS:tools_calib>)
+    target_include_directories(${tgt} PRIVATE ${PROJECT_SOURCE_DIR} ${EIGEN3_INCLUDE_DIR})
+    target_link_libraries(${tgt} PRIVATE ${OpenCV_LIBS} fmt::fmt yaml-cpp spdlog::spdlog)
+  endforeach()
   return()
 endif()
 
@@ -108,7 +118,7 @@ add_executable(calibrate_handeye calibration/calibrate_handeye.cpp)
 add_executable(calibrate_robotworld_handeye calibration/calibrate_robotworld_handeye.cpp)
 add_executable(split_video calibration/split_video.cpp)
 
-target_link_libraries(capture ${OpenCV_LIBS} fmt::fmt tools io)
+target_link_libraries(capture ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io lob_shot)
 target_link_libraries(calibrate_camera ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
 target_link_libraries(calibrate_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)
 target_link_libraries(calibrate_robotworld_handeye ${OpenCV_LIBS} fmt::fmt yaml-cpp tools)

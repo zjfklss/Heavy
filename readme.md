@@ -353,49 +353,63 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 
 ## 六、相机标定（上车感知前必做）
 
-吊射入口 `HEAVY_LOB_ONLY` **不读相机**。但上车做自瞄/打符前，必须按同济 `calibration/` 完成内外参。结果由 `tasks/auto_aim/solver.cpp`、`tasks/auto_buff/buff_solver.cpp` 使用。
+吊射入口 `HEAVY_LOB_ONLY` **运行时不读相机**，但已附带三套离线标定程序。采图 `capture` 仍需全量编译（相机 SDK）。结果给 `tasks/auto_aim/solver.cpp`、`tasks/auto_buff/buff_solver.cpp`。
+
+本段已按远程英雄 `jlauto-aim/hero/src/handeye_calibration` 定制：独立 `camera_info.yaml`、云台轴偏置、blob 圆点检测、两套手眼、串口姿态采图。**无 ROS。**
 
 #### 1. 编译与标定板
 
-`HEAVY_LOB_ONLY` **不会编**标定程序。需要全量编译：
-
 ```bash
-cmake -B build
-cmake --build build -j$(nproc)
+# 离线标定（HEAVY_LOB_ONLY 已含）
+cmake -B build_lob -DHEAVY_LOB_ONLY=ON && cmake --build build_lob -j$(nproc) \
+  --target calibrate_camera calibrate_handeye calibrate_robotworld_handeye
+
+# 采图需全量（相机 SDK）
+cmake -B build && cmake --build build -j$(nproc) --target capture
 ```
 
-全量依赖 OpenVINO、Eigen、相机 SDK。
+| 配置 | 板 | 云台偏置 |
+| --- | --- | --- |
+| `configs/calibration.yaml` | 10×7 @ 40 mm（同济默认） | 默认全 0 |
+| `configs/calibration_hero.yaml` | 7×7 @ 25 mm（远程英雄） | `p_yaw_to_pitch_mm: [62.11, 0, 151.32]` |
+| `configs/camera_info.yaml` | — | 远程英雄内参（ROS 格式） |
 
-标定板是**对称圆点阵**（`findCirclesGrid`），不是棋盘格。规格在 `configs/calibration.yaml`：`pattern_cols: 10`、`pattern_rows: 7`、`center_distance_mm: 40`。`capture.cpp` 里尺寸写死为 `10×7`，换板要改代码。
+板是**对称圆点阵**。`capture` 从 yaml 读行列数，勿再改死代码。
 
 #### 2. 内参
 
-1. 采图：`./build/capture configs/calibration.yaml -o assets/img_with_q`。按 `s` 保存、`q` 退出。相机类型、曝光、增益、`vid_pid` 从 yaml 读，支持 hikrobot / mindvision。只有视频时用 `split_video` 拆帧。
-2. 标定：`./build/calibrate_camera assets/img_with_q -c configs/calibration.yaml`。按 `1.jpg, 2.jpg, …` 顺序读，缺号即停。每张图弹窗确认，需要图形界面。固定 K3（`CALIB_FIX_K3`）。
-3. 产物只打印到终端，不写文件：`# 重投影误差`、`camera_matrix`（3×3 按行）、`distort_coeffs`（5 个）。
-4. 把结果手动粘到任务配置（字段名同 `configs/mvs.yaml`），**同时粘回 `configs/calibration.yaml`**。手眼程序要从这个文件读内参；缺字段会直接报错。
+1. 采图（全量 `build`）：
+   - 同济 CAN：`./build/capture configs/calibration.yaml -o assets/img_with_q`
+   - 英雄串口：`./build/capture configs/calibration_hero.yaml -o assets/img_with_q --attitude=serial`
+2. 标定：`./build_lob/calibrate_camera assets/img_with_q --config-path=configs/calibration.yaml`  
+   同时打印扁平字段与 ROS `camera_info`；默认写 `configs/camera_info.yaml`，可用 `--output=` 写扁平文件。固定 K3。  
+   （OpenCV CLI 请用 `--key=value`，`-c path` 空格形式会把 path 吃成 bool。）
+3. 扁平结果粘到任务 yaml，**并**保留 `camera_info.yaml` 供手眼 `--camera-info=`。
 
-样例（`configs/mvs.yaml`）：重投影约 **0.13 px**。
+#### 3. 手眼外参（两套）
 
-#### 3. 手眼外参
+输入：成对 `N.jpg` + `N.txt`（四元数 **wxyz**）。内参优先 `--camera-info`，否则读 config 里扁平字段。
 
-输入相同：文件夹内成对的 `N.jpg` 与 `N.txt`。txt 是采图时刻 IMU 四元数，顺序 **wxyz**。两者都要读 `calibration.yaml` 里的 `R_gimbal2imubody` 和内参。**不用 ROS 话题。**
+| 程序 | 何时用 | 原理 |
+| --- | --- | --- |
+| `calibrate_handeye` | 板固定、云台大范围转；默认 | `cv::calibrateHandEye` |
+| `calibrate_robotworld_handeye` | 还要解板世界位姿交叉验证（英雄主用） | `cv::calibrateRobotWorldHandEye` + 竖直板模型 |
 
-| 程序 | 何时用 | 原理 | 输出 |
-| --- | --- | --- | --- |
-| `calibrate_handeye` | 板固定、云台大范围转；默认用这个 | `cv::calibrateHandEye`，假设云台纯转动 | `R_camera2gimbal`、`t_camera2gimbal`（m），以及相对理想安装的 yaw/pitch/roll |
-| `calibrate_robotworld_handeye` | 还要解标定板世界位姿做交叉验证 | `cv::calibrateRobotWorldHandEye`；板按竖直放置建模 | 上面输出 + 板到原点水平距离、相对竖直偏角，可用卷尺核对 |
+英雄用法示例：
 
-含义：`xyz_gimbal = R·xyz_cam + t`。`R_gimbal2imubody` 是 IMU 安装旋转，当前样例为单位阵。
+```bash
+./build_lob/calibrate_robotworld_handeye assets/img_with_q \
+  --config-path=configs/calibration_hero.yaml \
+  --camera-info=configs/camera_info.yaml \
+  --output=configs/calibration_result.yaml
+```
 
-先确认 IMU 方向再解手眼：标定弹窗会叠 yaw/pitch/roll，方向不对先改 `R_gimbal2imubody`。
-
-**本队硬件差异**：`capture` 通过 `io::CBoard` 从 **CAN `can0`** 读四元数（同济方案）。本队电控是串口 0x5A，直接跑 `capture` 采不到 IMU，要先改代码换数据源。仓库里目前没有现成的串口版采图程序。
+`p_yaw_to_pitch_mm` / `p_pitch_to_barrel_mm` 建模 yaw/pitch 轴不共点；共点云台保持零。重投影超 `--reproj-max`（默认 1 px）的帧会被丢掉。
 
 #### 4. 常见坑
 
-1. USB3：先跑 MVS 的 `set_usbfs_memory_size.sh`、`set_usb_priority.sh`，插 USB3 口。掉帧会导致图像与四元数时间对不齐。
-2. 标定板贴硬平面，翘曲直接抬高误差。
-3. 内参：板要覆盖画面四角与边缘，不同倾角距离，经验 15–30 张。手眼：yaw 与 pitch 都要大范围转，旋转轴不能都相同，否则无唯一解。圆点必须全部识别成功。
-4. 重投影：代码只打印平均值。样例约 0.13 px。经验上 &lt;0.3 px 可接受，&gt;0.5 px 建议重采（经验阈值，非代码规定）。
-5. 标定内部用毫米，手眼输出平移已除以 1000 为米。`center_distance_mm` 必须填真实圆心间距。
+1. USB3：先跑 MVS `set_usbfs_*`，掉帧会导致图与姿态错位。
+2. 标定板贴硬平面；`center_distance_mm` 必须真实。
+3. 手眼：yaw 与 pitch 都要大范围转。先看弹窗叠的 yaw/pitch，方向不对先改 `R_gimbal2imubody`。
+4. 内参单位 mm，手眼平移输出已是 m。
+5. 参考结果：`configs/calibration_result_hero_ref.yaml`（远程实测，勿直接当本车外参）。
