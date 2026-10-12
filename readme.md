@@ -12,8 +12,10 @@
 | 远程 `jlcv-pc`（`192.168.1.25`） | `/home/jlcv/Heavy` |
 | GitHub | https://github.com/zjfklss/Heavy |
 | 钉头参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/solve_angle/src/opti_solver.cpp` |
+| 串口参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/jlcv_serial_driver` |
+| 标定参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/handeye_calibration` |
 
-`jlcv-pc` 上 2026-10-12 已编译通过。离线测试通过，俯仰角 33.27°。`--once` 进入 `READY`。当时没接串口和相机，发送走 `DrySender`。
+`jlcv-pc` 上 2026-10-12 起：离线测试通过，俯仰角 33.27°，`--once` 进入 `READY`。串口协议与标定工具已按英雄本机定制；实车击发仍取决于门闩与硬件接线。
 
 ## 一、本项目依赖安装（统一用 Ubuntu 22.04）
 
@@ -145,12 +147,15 @@ sudo apt-get install -y unzip unrar git net-tools
 ```bash
 cmake -B build_lob -DHEAVY_LOB_ONLY=ON
 cmake --build build_lob -j$(nproc)
+# 标定离线工具一并编出：
+#   calibrate_camera / calibrate_handeye / calibrate_robotworld_handeye
 ```
 
-编出来两个程序：
+主要程序：
 
 1. `build_lob/heavy_lob_offline_test`：离线测试，不读相机、不写串口
 2. `build_lob/heavy_lob`：吊射入口
+3. `build_lob/calibrate_*`：内参 + 两套手眼（无相机、无 ROS；采图见第六节）
 
 #### 1. 目录
 
@@ -158,12 +163,15 @@ cmake --build build_lob -j$(nproc)
 src/heavy_lob.cpp                         入口
 tasks/lob_shot/manager.cpp                状态机、门闩、永远低抛
 tasks/lob_shot/projectile_motion/         弹道
-tasks/lob_shot/a5_packet.cpp              0xA5，CRC 用 tools::get_crc16
+tasks/lob_shot/a5_packet.cpp              0xA5 下发 / 0x5A 回传解码
 tasks/lob_shot/gimbal_adapter.hpp         同济云台 SP 帧
-tasks/lob_shot/lob_serial.cpp             DrySender / SerialSender
+tasks/lob_shot/lob_serial.cpp             DrySender / SerialSender（英雄 ttyUSB0@921600）
+calibration/                              内参 + 两套手眼（迁自英雄 handeye_calibration）
 configs/heavy_lob.yaml                    开环验收，门闩打开
-configs/heavy_lob_robot.yaml              实车默认，门闩关闭
-tests/heavy_lob_offline_test.cpp          离线测试
+configs/heavy_lob_robot.yaml              实车默认，门闩关闭；串口/波特率/deploy
+configs/calibration_hero.yaml             英雄板 7×7@25mm + 云台轴偏置
+configs/camera_info.yaml                  英雄内参（ROS camera_info）
+tests/heavy_lob_offline_test.cpp          离线测试（含 hero_5a_ok）
 ```
 
 根目录的 `autostart.sh` 是同济全量视觉的自启，里面写的是 `~/Desktop/sp_vision_25`。吊射不要跑这个脚本。
@@ -204,7 +212,9 @@ tests/heavy_lob_offline_test.cpp          离线测试
 | `--undock` | 模拟吊射模块未对接 |
 | `--loop` | 50 Hz 循环，直到退出 |
 | `--dry-run` | 默认 true，只打印报文 |
-| `--port` | 串口，默认 `/dev/ttyUSB0` |
+| `--port` | 串口，默认 `/dev/ttyUSB0`（英雄 `device_name`） |
+| `--baud` | 波特率，默认 `921600` |
+| `--deploy` | 0xA5 deploy 位置 1（英雄部署模式） |
 
 实车循环（串口约定对齐英雄 `jlcv_serial_driver`：`/dev/ttyUSB0` @ 921600，下发 0xA5，回传 0x5A）：
 
@@ -212,7 +222,7 @@ tests/heavy_lob_offline_test.cpp          离线测试
 ./build_lob/heavy_lob configs/heavy_lob_robot.yaml --loop --dry-run=false --port=/dev/ttyUSB0
 ```
 
-`--deploy=true` 把 0xA5 的 deploy 位置 1（英雄部署模式）。回传弹速 >1 时会写进解算。串口打不开会退回 `DrySender`。
+`--deploy=true` 或 yaml `deploy: true`。回传 `curr_pitch` / `curr_yaw` 进闭环；`bullet_speed` >1 时写进解算。串口打不开会退回 `DrySender`。
 
 `--once` 的退出码：到达预期终态为 0。没到 `READY`、开火后不是 `z=2`、或未对接时没有被抑制，返回非 0。
 
@@ -225,7 +235,7 @@ tests/heavy_lob_offline_test.cpp          离线测试
 
 #### 6. 还没接上的硬件
 
-真实云台串口、C 板、海康相机、`imu_world` 航向标定都还没做。上面的结果是干跑，不是上车击发。
+协议与工具已齐：0xA5/0x5A、英雄标定配置与离线程序。实车仍缺：门闩运行时信号、海康相机接线、`imu_world` / 站位实测。上面 dry-run 不是上车击发。
 
 ## 四、调试
 
@@ -267,22 +277,23 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 | 位姿 | TF：`map→base_link→muzzle` | yaml 先验 `base_*`、`base_yaw`、`muzzle_*` |
 | yaw 基点 | 底盘原点 | 枪口点（`muzzle_dx/dy` 为 0 时两者一致） |
 | 门闩 | 话题 `/lob_shot/module_*` | 只读 yaml 与 `--undock`，运行时无信号输入 |
-| 反馈 | `/joint_states` | `read_feedback()` 空实现，永远 false |
-| 出口 | 话题交给串口驱动打包 0xA5 | 本程序自打包 0xA5；同济 SP 只打日志 |
+| 反馈 | `/joint_states` | 解析英雄 `0x5A`（pitch/yaw/bullet_speed）；无串口时 DrySender |
+| 出口 | 话题交给串口驱动打包 0xA5 | 本程序自打包 0xA5（含 deploy）；同济 SP 只打日志 |
 | 空闲发帧 | IDLE 不发 | IDLE 不发；`--loop` 下 **INHIBITED 会持续发 z=0** |
+| 标定 | ROS handeye 包 | 无 ROS：`calibration/` + `configs/calibration_hero.yaml` / `camera_info.yaml` |
 
-已对齐：状态机 `WAITING → YAW → PITCH → READY`；门闩语义 `unlocked && docked && !assembling`；风车圆柱；`pitch_max` 超限抑制；dry-run 俯仰角 33.27°。
+已对齐：状态机 `WAITING → YAW → PITCH → READY`；门闩语义；风车；`pitch_max`；dry-run 33.27°；英雄串口与双套手眼工具。
 
 #### 2. 已知未接线与风险
 
 1. 直接用 `heavy_lob_robot.yaml` 会一直 `INHIBITED`：门闩默认 false，又没有运行时信号能打开。
-2. 闭环跑不通：`open_loop: false` 时读不到反馈，会停在 `YAW_CONVERGING`，超时回 IDLE。
+2. 闭环要有真实 0x5A；无串口或反馈坏掉时仍会停在 `*_CONVERGING`（可先 `open_loop: true`）。
 3. `--loop --fire` 一进入 READY 就持续发 `z=2`，没有运行时开火开关。
-4. 实车 yaml 的 `friction_coeff` 是 0.0，旧 Heavy `robot.yaml` 是 0.001。
-5. 0x5A 回传未解析，`set_bullet_speed()` 存在但入口未调用；波特率写死 921600。
+4. 实车 yaml 的 `friction_coeff` 默认 0.0，旧 Heavy `robot.yaml` 是 0.001（联调建议先改回 0.001）。
+5. 标定采图 `capture` 需全量编译（相机 SDK）；`HEAVY_LOB_ONLY` 只带离线解算三件套。
 
-**改 yaml 即可**：几何、弹速、摩擦、门闩初值、开环开关、风车、符号、公差。  
-**必须改代码**：门闩信号、解析 0x5A、改波特率、`deploy` 字节、INHIBITED 不发帧、运行时开火/取消。
+**改 yaml 即可**：几何、弹速、摩擦、门闩初值、开环、风车、符号、公差、串口/波特率/deploy、标定板与云台偏置。  
+**必须改代码 / 接线**：门闩运行时信号、INHIBITED 不发帧、运行时开火/取消、实车相机与站位标定数据落盘。
 
 #### 3. 分场景调参
 
@@ -317,7 +328,7 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 
 ##### 实车闭环（有 yaw / pitch 反馈）
 
-**当前做不到。** 先改 `SerialSender::read_feedback()` 解析 0x5A 的 `curr_pitch` / `curr_yaw`，再调：
+`SerialSender` 已解析 0x5A。接上电控后 `open_loop: false`，再调：
 
 | 参数 | 现象 | 步进 | 验收 |
 | --- | --- | --- | --- |
@@ -325,7 +336,7 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 | `aim_timeout_s` | `IDLE (... timeout)` | 1 s | 不再超时 |
 | `pitch_sign` / `yaw_sign` | 越追越远 | 只有 ±1 | 误差单调减小 |
 
-反馈符号必须与下发命令同一坐标约定。
+反馈符号必须与下发命令同一坐标约定。无反馈时先退回 `open_loop: true`。
 
 ##### 风车抑制区
 
@@ -349,7 +360,7 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length
 | `base_yaw`（**rad**） | yaw 常数偏置 | 1:1 进 yaw | 0.005 rad | `yaw_deg` |
 | `pitch_sign`/`yaw_sign` | 云台反向 | — | ±1 | 先不加 `--fire` |
 
-推荐顺序：符号 → `base_yaw` → 几何 → `bullet_speed` → `friction`。弹速最好以后从 0x5A 实时读，那一步要改代码。
+推荐顺序：符号 → `base_yaw` → 几何 → `bullet_speed` → `friction`。弹速已可从 0x5A 实时写入（回传 >1 时）。
 
 ## 六、相机标定（上车感知前必做）
 
@@ -378,9 +389,9 @@ cmake -B build && cmake --build build -j$(nproc) --target capture
 
 #### 2. 内参
 
-1. 采图（全量 `build`）：
-   - 同济 CAN：`./build/capture configs/calibration.yaml -o assets/img_with_q`
-   - 英雄串口：`./build/capture configs/calibration_hero.yaml -o assets/img_with_q --attitude=serial`
+1. 采图（全量 `build`，需相机 SDK）：
+   - 同济 CAN：`./build/capture --config-path=configs/calibration.yaml --output-folder=assets/img_with_q`
+   - 英雄串口：`./build/capture --config-path=configs/calibration_hero.yaml --output-folder=assets/img_with_q --attitude=serial`
 2. 标定：`./build_lob/calibrate_camera assets/img_with_q --config-path=configs/calibration.yaml`  
    同时打印扁平字段与 ROS `camera_info`；默认写 `configs/camera_info.yaml`，可用 `--output=` 写扁平文件。固定 K3。  
    （OpenCV CLI 请用 `--key=value`，`-c path` 空格形式会把 path 吃成 bool。）
