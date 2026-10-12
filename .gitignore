@@ -1,6 +1,5 @@
 build/
-install/
-log/
-__pycache__/
-*.pyc
-.colcon/
+build_lob/
+*.o
+*.a
+.local_fork
