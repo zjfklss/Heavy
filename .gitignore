@@ -1,5 +1,7 @@
 build/
 build_lob/
+build_full/
+logs/
 *.o
 *.a
 .local_fork
