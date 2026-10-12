@@ -34,7 +34,7 @@ HeroBoard::HeroBoard(const std::string & config_path)
     tools::logger()->info("[HeroBoard] {} @{} mode={}", port, baud, MODES[mode]);
   }
 
-  // 先放两帧，imu_at 的 slerp 和 CBoard 一样要队列里已有前后样本
+  // 预填两帧：imu_at 的 slerp 与 CBoard 相同，需要前后样本
   const auto t0 = std::chrono::steady_clock::now();
   queue_.push({Eigen::Quaterniond::Identity(), t0});
   queue_.push({Eigen::Quaterniond::Identity(), t0 + std::chrono::milliseconds(1)});
@@ -55,6 +55,7 @@ HeroBoard::~HeroBoard()
 
 Eigen::Quaterniond HeroBoard::joint_to_q(double yaw, double pitch)
 {
+  // 英雄 URDF：yaw 绕 +Z，pitch 关节轴 (0,-1,0)；与标定 capture 一致
   return Eigen::Quaterniond(
     Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()) *
     Eigen::AngleAxisd(pitch, Eigen::Vector3d(0, -1, 0)));

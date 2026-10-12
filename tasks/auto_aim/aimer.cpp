@@ -13,9 +13,9 @@ namespace auto_aim
 {
 namespace
 {
-// EKF: x vx y vy z vz a w r l h —— w 在 [7]
+// EKF: x vx y vy z vz a w r l h（见 target.cpp）。同济旧码陀螺分支误用 [8]=r，此处固定用 w。
 constexpr int kIdxW = 7;
-constexpr int kIdxR = 8;
+constexpr int kIdxR = 8;  // 半径；选板勿当转速
 }  // namespace
 
 Aimer::Aimer(const std::string & config_path)
@@ -62,7 +62,7 @@ io::Command Aimer::aim(
   if (targets.empty()) return {false, false, 0, 0};
   auto target = targets.front();
 
-  // 转速取绝对值（hero 旧代码 v_yaw < 1 未取 abs，反向会误入宽窗；此处一并修）
+  // |w|：同济 delay 曾用带符号 w，反向高速误走低速延时；planner 已 abs，此处对齐
   const double abs_w = std::abs(target.ekf_x()[kIdxW]);
   double delay_time = abs_w > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
@@ -244,7 +244,7 @@ AimPoint Aimer::choose_aim_point(const Target & target)
     delta_angle_list.emplace_back(delta_angle);
   }
 
-  // 修：角速度是 ekf[7]，旧代码误用 [8]（半径）导致几乎永不进陀螺分支
+  // 低速/非陀螺选板：|w|<=2。同济原版写 ekf[8]（半径）→ 几乎永远进此分支，见上游 #15
   const double abs_w = std::abs(ekf_x[kIdxW]);
   if (abs_w <= 2 && target.name != ArmorName::outpost) {
     std::vector<int> id_list;

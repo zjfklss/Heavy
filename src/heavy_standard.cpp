@@ -1,4 +1,5 @@
-// 同济 mt_standard / uav 的循环，电控换成自家英雄 jlcv_serial_driver。
+// 上车主入口：同济 mt_standard 循环形状，电控换成英雄 0xA5/0x5A（HeroBoard）。
+// 本轮仅短焦；自瞄/打符 pitch 经 send() 默认翻号，吊射 send(..., false) 且 20ms 一拍。
 #include <chrono>
 #include <memory>
 #include <thread>

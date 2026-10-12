@@ -3,5 +3,3 @@ build_lob/
 *.o
 *.a
 .local_fork
-build_full/
-logs/

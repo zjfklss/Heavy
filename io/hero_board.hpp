@@ -16,8 +16,8 @@
 namespace io
 {
 
-// 自家英雄 jlcv_serial_driver：0x5A 回传，0xA5 的 x=pitch y=yaw z=0/1/2。
-// 调用形状照 CBoard，供同济主循环使用。
+// 英雄 jlcv_serial_driver：0x5A 回传，0xA5 的 x=pitch(抬头正) y=yaw z=0/1/2。
+// 对外形状照 CBoard，供同济式主循环（heavy_standard）直接替换电控对象。
 class HeroBoard
 {
 public:
@@ -28,11 +28,11 @@ public:
   ~HeroBoard();
 
   Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point timestamp);
-  // tongji_pitch=true：同济抬头为负 → 0xA5 抬头为正；lob 已是抬头为正，传 false。
+  // tongji_pitch：同济世界系抬头为负；英雄 0xA5 抬头为正。吊射已是抬头正，传 false。
   void send(Command command, bool tongji_pitch = true) const;
 
   void latest_joint(double & yaw, double & pitch) const;
-  int camera_id() const { return camera_id_.load(); }  // 0 短焦上置，1 长焦下置
+  int camera_id() const { return camera_id_.load(); }  // 0 短焦上置，1 长焦下置（本轮忽略长焦）
   bool take_reset();
 
 private:

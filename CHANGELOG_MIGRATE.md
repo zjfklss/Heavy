@@ -1,5 +1,28 @@
 # CHANGELOG · 重装吊射迁同济
 
+## 2026-10-12 · heavy_standard 上车骨架
+
+### 新增
+
+- `io/hero_board`：照 `CBoard` 的 `imu_at` / `send`；英雄 `0xA5/0x5A`
+- `src/heavy_standard.cpp`：同济 `mt_standard` 循环（自瞄 / 打符 / 吊射）
+- `configs/heavy_standard.yaml`：短焦占位 + 钉头 + 吊射先验
+- 自瞄/打符 pitch 翻号（同济抬头负 → 英雄抬头正）；吊射不翻、20 ms 节拍
+- 全量 CMake 修 `heavy_lob` 链接（OpenCV + tools + spdlog）
+- 英雄小电脑 `~/Heavy` 建 Git 仓并对齐 GitHub `zjfklss/Heavy`
+- 同济上游意见草稿补 Issue 4/5；Issue 1 已开 #15
+
+### 本队相对同济的修复（勿当上游已合）
+
+- `aimer`：转速用 `ekf[7]` + `|w|`；钉头 `nail_mode`
+- `buff_aimer`：`yaw/pitch` 先置 `last_*`，避免未初始化比较
+
+### 明确未完成
+
+短焦实车标定替换占位；长焦；串口动态切 buff/lob。
+
+---
+
 ## 2026-10-08 夜 · 审查后 P1 补齐
 
 ### 新增/修复

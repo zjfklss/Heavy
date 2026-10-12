@@ -32,7 +32,7 @@ public:
     std::list<Target> targets, std::chrono::steady_clock::time_point timestamp, double bullet_speed,
     io::ShootMode shoot_mode, bool to_now = true);
 
-  // 重装钉头：云台 yaw 钉车中心，窗口内开火（抄自 jlauto-aim/hero processAssessment2）
+  // 钉头：小陀螺时 yaw 钉车中心、窗口开火，避免重装云台追板（hero processAssessment2）
   bool nail_mode() const { return nail_mode_; }
   bool nail_latched() const { return nail_latched_; }
 

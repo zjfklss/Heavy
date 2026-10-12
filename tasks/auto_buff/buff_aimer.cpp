@@ -31,12 +31,14 @@ io::Command Aimer::aim(
 
   auto detect_now_gap = tools::delta_time(now, timestamp);
   auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
+  // 同济旧码在 get_send_angle 前用未初始化 yaw/pitch 做跳变判断（UB）；先落到 last_*
   double yaw = last_yaw_;
   double pitch = last_pitch_;
 
   if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
     command.yaw = yaw;
-    command.pitch = -pitch;  //世界坐标系下的pitch向上为负
+    command.pitch = -pitch;  // 同济世界系：抬头为负；英雄下发由 HeroBoard 再翻号
+
     if (mistake_count_ > 3) {
       switch_fanblade_ = true;
       mistake_count_ = 0;
@@ -83,13 +85,14 @@ auto_aim::Plan Aimer::mpc_aim(
 
   auto detect_now_gap = tools::delta_time(now, timestamp);
   auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
-  double yaw, pitch;
+  // 同非 MPC 路径：勿在 get_send_angle 前读未初始化局部变量
+  double yaw = last_yaw_;
+  double pitch = last_pitch_;
 
-  bool angle_changed =
-    std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
   if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
     plan.yaw = yaw;
-    plan.pitch = -pitch;  //世界坐标系下的pitch向上为负
+    plan.pitch = -pitch;  // 同济世界系：抬头为负
+
     if (mistake_count_ > 3) {
       switch_fanblade_ = true;
       mistake_count_ = 0;

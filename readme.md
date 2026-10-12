@@ -1,21 +1,25 @@
-# 重装吊射
+# 重装视觉（同济壳 · 英雄电控）
 
-本仓库是同济 `sp_vision` 上的重装吊射。单独编译、单独运行，不走步兵或哨兵自瞄。弹道只用低抛；高抛角会算出来写进日志，不拿去瞄准。
+同济 `sp_vision` 无 ROS 壳上的重装栈：吊射永远低抛；自瞄默认**钉头**（小陀螺不追板）。电控是自家英雄 `0xA5/0x5A`，不是同济 CAN/SP。
 
 **操作手请先看：** [docs/操作手速查.md](docs/操作手速查.md)
 
-重装云台很重，打小陀螺必须**钉头**（yaw 钉车中心、窗口开火），不能动头追板。钉头算法已从远程英雄 `jlauto-aim/hero` 的 `processAssessment2` 抄进 `tasks/auto_aim/aimer.cpp`（`nail_mode`，配置见 `configs/heavy_nail.yaml`）。吊射入口与钉头自瞄仍是两套：吊射可 `HEAVY_LOB_ONLY` 干跑；钉头还要相机和全量视觉入口才能上车。
+| 入口 | 用途 |
+| --- | --- |
+| `heavy_standard` | **上车主入口**（短焦自瞄/打符/吊射），全量编译 |
+| `heavy_lob` | 只吊射；`HEAVY_LOB_ONLY` 可无 OpenVINO 干跑 |
+
+本轮只做短焦。钉头在 `tasks/auto_aim/aimer.cpp`（`nail_mode`）；配置见 `configs/heavy_standard.yaml` / `heavy_nail.yaml`。
 
 | 位置 | 路径 |
 | --- | --- |
 | 开发机 | `~/jl_sp_vision` |
-| 远程 `jlcv-pc`（`192.168.1.25`） | `/home/jlcv/Heavy` |
+| 远程 `jlcv-pc`（`192.168.1.25`） | `/home/jlcv/Heavy`（已接 GitHub） |
 | GitHub | https://github.com/zjfklss/Heavy |
-| 钉头参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/solve_angle/src/opti_solver.cpp` |
-| 串口参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/jlcv_serial_driver` |
-| 标定参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/handeye_calibration` |
+| 钉头参考 | 远程 `jlauto-aim/hero` · `processAssessment2` |
+| 串口参考 | 远程 `jlauto-aim/hero` · `jlcv_serial_driver` |
 
-`jlcv-pc` 上 2026-10-12 起：离线测试通过，俯仰角 33.27°，`--once` 进入 `READY`。串口协议与标定工具已按英雄本机定制；实车击发仍取决于门闩与硬件接线。
+`jlcv-pc`：离线测 pitch≈33.27°；`build_full/heavy_standard` 已编过。短焦内参仍是占位，上场前用圆点标定替换。
 
 ## 一、本项目依赖安装（统一用 Ubuntu 22.04）
 
@@ -62,7 +66,8 @@ sudo apt-get install -y \
 
 吊射入口没有 ROS 节点，不用 FishROS，不用 Galactic，也不用 Humble。
 
-树里的 `io/ros2`、`tasks/auto_aim`、`tasks/auto_buff` 是同济原工程。不带 `HEAVY_LOB_ONLY` 的全量编译才需要 OpenVINO 和相机 SDK，那不是吊射的运行方式。
+树里的 `io/ros2`、`tasks/auto_aim`、`tasks/auto_buff` 是同济原工程。  
+**上车主入口 `heavy_standard` 必须全量编译**（OpenVINO + 海康）。`HEAVY_LOB_ONLY` 只给吊射干跑/标定离线解算。
 
 哨兵的 Cartographer、octomap、rosbag 也不在本入口里装。
 
@@ -142,40 +147,44 @@ sudo apt-get install -y unzip unrar git net-tools
 
 ## 三、代码使用
 
-在仓库根目录编译：
+吊射 only：
 
 ```bash
 cmake -B build_lob -DHEAVY_LOB_ONLY=ON
 cmake --build build_lob -j$(nproc)
-# 标定离线工具一并编出：
-#   calibrate_camera / calibrate_handeye / calibrate_robotworld_handeye
+```
+
+上车主入口（小电脑已装 OpenVINO / 海康）：
+
+```bash
+source /opt/intel/openvino_2024.6.0/setupvars.sh
+cmake -B build_full -DHEAVY_LOB_ONLY=OFF
+cmake --build build_full -j$(nproc) --target heavy_standard heavy_lob heavy_lob_offline_test
+./build_full/heavy_standard configs/heavy_standard.yaml
 ```
 
 主要程序：
 
-1. `build_lob/heavy_lob_offline_test`：离线测试，不读相机、不写串口
-2. `build_lob/heavy_lob`：吊射入口
-3. `build_lob/calibrate_*`：内参 + 两套手眼（无相机、无 ROS；采图见第六节）
+1. `heavy_standard`：短焦自瞄（钉头）+ 打符 + 吊射（全量）
+2. `heavy_lob` / `heavy_lob_offline_test`：吊射
+3. `calibrate_*`：内参 + 两套手眼（`HEAVY_LOB_ONLY` 也可编离线解算）
 
 #### 1. 目录
 
 ```
-src/heavy_lob.cpp                         入口
-tasks/lob_shot/manager.cpp                状态机、门闩、永远低抛
-tasks/lob_shot/projectile_motion/         弹道
-tasks/lob_shot/a5_packet.cpp              0xA5 下发 / 0x5A 回传解码
-tasks/lob_shot/gimbal_adapter.hpp         同济云台 SP 帧
-tasks/lob_shot/lob_serial.cpp             DrySender / SerialSender（英雄 ttyUSB0@921600）
-calibration/                              小圆点板内参 + 两套手眼（检测器复用）
-configs/heavy_lob.yaml                    开环验收，门闩打开
-configs/heavy_lob_robot.yaml              实车默认，门闩关闭；串口/波特率/deploy
-configs/calibration.yaml                  主标定配置（7×7@25mm）
-configs/camera_info.yaml                  内参（ROS camera_info）
-docs/圆点标定操作流程.md                   标定逐步手册
-tests/heavy_lob_offline_test.cpp          离线测试（含 hero_5a_ok）
+src/heavy_standard.cpp                    上车主循环（HeroBoard）
+src/heavy_lob.cpp                         吊射入口
+io/hero_board.*                           英雄串口，形状照 CBoard
+tasks/lob_shot/                           状态机、0xA5/0x5A、永远低抛
+tasks/auto_aim/aimer.cpp                  钉头 + 已修 ekf[7] 转速
+calibration/                              小圆点板
+configs/heavy_standard.yaml               上车短焦（内参先占位）
+configs/heavy_lob.yaml / _robot.yaml      吊射干跑 / 实车门闩
+docs/操作手速查.md                         最短上车说明
+docs/同济上游意见草稿.md                   同济原码问题（#15）
 ```
 
-根目录的 `autostart.sh` 是同济全量视觉的自启，里面写的是 `~/Desktop/sp_vision_25`。吊射不要跑这个脚本。
+根目录的 `autostart.sh` 是同济全量视觉的自启，里面写的是 `~/Desktop/sp_vision_25`。不要跑这个脚本。
 
 #### 2. 先跑测试
 
