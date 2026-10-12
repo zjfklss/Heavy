@@ -21,9 +21,11 @@ enum Mode
   auto_aim,
   small_buff,
   big_buff,
-  outpost
+  outpost,
+  lob
 };
-const std::vector<std::string> MODES = {"idle", "auto_aim", "small_buff", "big_buff", "outpost"};
+const std::vector<std::string> MODES = {
+  "idle", "auto_aim", "small_buff", "big_buff", "outpost", "lob"};
 
 // 哨兵专有
 enum ShootMode

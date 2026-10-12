@@ -90,9 +90,14 @@ bool SerialSender::feed_byte(uint8_t b, Feedback & out)
     return false;
   }
   out.ok = true;
-  out.pitch = pkt.curr_pitch;  // rad，与英雄 joint_states 一致
+  out.pitch = pkt.curr_pitch;  // rad，自家英雄 joint_states
   out.yaw = pkt.curr_yaw;
   out.bullet_speed = pkt.bullet_speed;
+  out.enemy_color = pkt.enemy_color;
+  out.game_status = pkt.game_status;
+  out.outpost = pkt.outpost_status != 0;
+  out.reset_tracker = pkt.reset_tracker != 0;
+  out.camera_bit = pkt.camera_status;
   out.stamp = std::chrono::steady_clock::now();
   rx_.clear();
   return true;

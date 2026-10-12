@@ -19,6 +19,11 @@ struct Feedback
   double pitch = 0;
   double bullet_speed = 0;
   bool ok = false;
+  int enemy_color = 0;    // 0 红 1 蓝，与 jlcv_serial_driver 一致
+  int game_status = 0;
+  bool outpost = false;
+  bool reset_tracker = false;
+  int camera_bit = 0;     // 包内原始位；驱动里短焦/长焦是 1-bit
   std::chrono::steady_clock::time_point stamp{};
 };
 

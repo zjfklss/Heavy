@@ -11,6 +11,7 @@ add_library(io STATIC
     usbcamera/usbcamera.cpp  
     camera.cpp
     cboard.cpp
+    hero_board.cpp
     dm_imu/dm_imu.cpp
     gimbal/gimbal.cpp
 )
@@ -35,7 +36,7 @@ else()
   message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
 endif()
 
-target_link_libraries(io MvCameraControl MVSDK usb-1.0 yaml-cpp serial)
+target_link_libraries(io MvCameraControl MVSDK usb-1.0 yaml-cpp serial lob_shot)
 
 ################## 检查 ROS 环境 ##################
 find_package(ament_cmake QUIET)
