@@ -28,7 +28,8 @@ public:
   ~HeroBoard();
 
   Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point timestamp);
-  void send(Command command) const;
+  // tongji_pitch=true：同济抬头为负 → 0xA5 抬头为正；lob 已是抬头为正，传 false。
+  void send(Command command, bool tongji_pitch = true) const;
 
   void latest_joint(double & yaw, double & pitch) const;
   int camera_id() const { return camera_id_.load(); }  // 0 短焦上置，1 长焦下置

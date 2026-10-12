@@ -116,7 +116,7 @@ Eigen::Quaterniond HeroBoard::imu_at(std::chrono::steady_clock::time_point times
   return q_a.slerp(k, q_b).normalized();
 }
 
-void HeroBoard::send(Command command) const
+void HeroBoard::send(Command command, bool tongji_pitch) const
 {
   if (!serial_ || !serial_->is_open()) return;
   lob_shot::Command cmd;
@@ -124,7 +124,8 @@ void HeroBoard::send(Command command) const
   cmd.shoot = command.shoot;
   cmd.deploy = deploy_;
   cmd.yaw = command.yaw;
-  cmd.pitch = command.pitch;
+  // 同济 Aimer/Buff：世界系抬头为负；英雄 0xA5：抬头为正
+  cmd.pitch = tongji_pitch ? -command.pitch : command.pitch;
   serial_->send(cmd);
 }
 

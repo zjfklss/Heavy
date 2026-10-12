@@ -78,17 +78,18 @@ include_directories(${PROJECT_SOURCE_DIR})
 add_subdirectory(tasks/lob_shot)
 add_executable(heavy_lob src/heavy_lob.cpp)
 target_include_directories(heavy_lob PRIVATE ${PROJECT_SOURCE_DIR}/tasks)
-target_link_libraries(heavy_lob PRIVATE lob_shot yaml-cpp fmt::fmt)
 add_executable(heavy_lob_offline_test tests/heavy_lob_offline_test.cpp)
 target_include_directories(heavy_lob_offline_test PRIVATE ${PROJECT_SOURCE_DIR}/tasks)
 target_link_libraries(heavy_lob_offline_test PRIVATE lob_shot)
-
 
 add_subdirectory(tools)
 add_subdirectory(io)
 add_subdirectory(tasks/auto_aim)
 add_subdirectory(tasks/auto_buff)
 add_subdirectory(tasks/omniperception)
+
+# 全量路径：OpenCV(CLI) + tools（Exiter/Plotter/logger）+ spdlog
+target_link_libraries(heavy_lob PRIVATE lob_shot yaml-cpp fmt::fmt spdlog::spdlog ${OpenCV_LIBS} tools)
 
 ####################src###################
 add_executable(standard src/standard.cpp)

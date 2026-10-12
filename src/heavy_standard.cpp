@@ -1,6 +1,7 @@
 // 同济 mt_standard / uav 的循环，电控换成自家英雄 jlcv_serial_driver。
 #include <chrono>
 #include <memory>
+#include <thread>
 #include <opencv2/opencv.hpp>
 #include <yaml-cpp/yaml.h>
 
@@ -117,10 +118,14 @@ int main(int argc, char * argv[])
     }
     if (board.camera_id() != last_cam) {
       last_cam = board.camera_id();
-      tools::logger()->info("英雄相机 {}（0 短焦上置 / 1 长焦下置）", last_cam);
+      if (last_cam == 1) {
+        tools::logger()->warn("电控切长焦，本轮仅短焦：仍用短焦相机与内参");
+      } else {
+        tools::logger()->info("英雄相机短焦（上置）");
+      }
     }
 
-    // 吊射：不取图，只跑状态机
+    // 吊射：不取图，只跑状态机；pitch 已是抬头为正，勿走同济翻号
     if (mode == io::Mode::lob) {
       if (!lob_armed) {
         lob.request_trigger();
@@ -133,9 +138,10 @@ int main(int argc, char * argv[])
       const auto now = std::chrono::steady_clock::now();
       const double dt = std::chrono::duration<double>(now - prev).count();
       prev = now;
-      auto lob_cmd = lob.tick(dt > 0 ? dt : 0.01);
+      auto lob_cmd = lob.tick(dt > 0 ? dt : 0.02);
       io::Command cmd{lob_cmd.control, lob_cmd.shoot, lob_cmd.yaw, lob_cmd.pitch};
-      board.send(cmd);
+      board.send(cmd, false);
+      std::this_thread::sleep_for(20ms);
       continue;
     }
     prev = std::chrono::steady_clock::now();
@@ -151,7 +157,7 @@ int main(int argc, char * argv[])
       auto targets = tracker->track(armors, t);
       auto command = aimer.aim(targets, t, board.bullet_speed);
       command.shoot = shooter.shoot(command, aimer, targets, ypr);
-      board.send(command);
+      board.send(command);  // 同济抬头为负 → 0xA5 翻号
     } else if (mode == io::Mode::small_buff || mode == io::Mode::big_buff) {
       buff_solver.set_R_gimbal2world(q);
       auto power_runes = buff_detector.detect(img);
@@ -166,7 +172,7 @@ int main(int argc, char * argv[])
         auto target_copy = buff_big_target;
         buff_command = buff_aimer.aim(target_copy, t, board.bullet_speed, true);
       }
-      board.send(buff_command);
+      board.send(buff_command);  // 同济抬头为负 → 0xA5 翻号
     }
   }
 
