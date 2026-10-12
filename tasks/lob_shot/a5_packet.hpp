@@ -22,8 +22,8 @@ struct ReceivePacket5A
   uint8_t reset_tracker : 1;
   uint8_t camera_status : 1;
   uint8_t reserved : 1;
-  float curr_pitch = 0;
-  float curr_yaw = 0;
+  float curr_pitch = 0;  // rad，英雄 joint_states
+  float curr_yaw = 0;     // rad
   float bullet_speed = 0;
   uint16_t checksum = 0;
 };

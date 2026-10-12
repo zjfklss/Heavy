@@ -33,6 +33,8 @@ can_interface: "can0"
 
 serial_port: /dev/ttyUSB0
 baud: 921600
+# 0x5A 为弧度。采图四元数按 URDF：yaw +Z，pitch 轴 (0,-1,0)。超过此时差不保存。
+attitude_skew_ms: 20
 
 # 内参：优先 --camera-info=configs/camera_info.yaml；none 时用下面扁平字段
 camera_matrix: [3546.58523, 0.0, 730.97855, 0.0, 3545.36711, 572.93391, 0.0, 0.0, 1.0]

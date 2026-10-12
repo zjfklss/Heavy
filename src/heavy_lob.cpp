@@ -95,7 +95,7 @@ lob_shot::Command settle(lob_shot::Manager & mgr)
 void apply_feedback(lob_shot::Manager & mgr, const lob_shot::Feedback & fb)
 {
   if (!fb.ok) return;
-  mgr.set_feedback(fb.yaw, fb.pitch);
+  mgr.set_feedback(fb.yaw, lob_shot::joint_pitch_to_nose_up(fb.pitch));
   if (fb.bullet_speed > 1.0) mgr.set_bullet_speed(fb.bullet_speed);
 }
 

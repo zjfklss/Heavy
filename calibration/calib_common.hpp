@@ -1,6 +1,7 @@
 #pragma once
 // 小圆点板主路径（英雄 7×7 @ 25mm 对称阵）：BoardConfig + 可复用检测器
 
+#include <algorithm>
 #include <fmt/core.h>
 #include <yaml-cpp/yaml.h>
 
@@ -99,6 +100,11 @@ public:
     p.filterByColor = true;
     p.blobColor = cfg.blob_color;
     blob_ = cv::SimpleBlobDetector::create(p);
+    // 预览降采样后，面积阈值按面积比缩小，物理尺寸与全分辨率一致
+    const float s = (cfg.detect_scale > 0.f && cfg.detect_scale < 1.f) ? cfg.detect_scale : 1.f;
+    p.minArea = cfg.blob_min_area * s * s;
+    p.maxArea = cfg.blob_max_area * s * s;
+    blob_preview_ = cv::SimpleBlobDetector::create(p);
   }
 
   // full_res=true：全分辨率（保存复检 / 离线解算）
@@ -122,8 +128,9 @@ public:
       src = &scaled_;
     }
 
+    auto blob = (scale < 1.f) ? blob_preview_ : blob_;
     bool ok = cv::findCirclesGrid(
-      *src, cfg_.pattern_size(), centers, cv::CALIB_CB_SYMMETRIC_GRID, blob_);
+      *src, cfg_.pattern_size(), centers, cv::CALIB_CB_SYMMETRIC_GRID, blob);
     if (ok && scale < 1.f) {
       const float inv = 1.f / scale;
       for (auto & pt : centers) {
@@ -139,11 +146,40 @@ public:
 private:
   BoardConfig cfg_;
   cv::Ptr<cv::SimpleBlobDetector> blob_;
+  cv::Ptr<cv::SimpleBlobDetector> blob_preview_;
   cv::Mat gray_;
   cv::Mat scaled_;
 };
 
-// 平面板：角点原点左上（内参 / calibrateHandEye）
+// 对称圆点阵 180° 翻转：与上一帧点序更近则整序反转。两序都离得很远时保持检测序。
+inline bool align_symmetric_180(
+  const std::vector<cv::Point2f> * prev, std::vector<cv::Point2f> & cur, double max_jump_px = 80.0)
+{
+  if (prev == nullptr || prev->size() != cur.size() || cur.empty()) return false;
+  auto mean = [](const std::vector<cv::Point2f> & a, const std::vector<cv::Point2f> & b) {
+    double s = 0;
+    for (size_t i = 0; i < a.size(); i++) s += cv::norm(a[i] - b[i]);
+    return s / static_cast<double>(a.size());
+  };
+  std::vector<cv::Point2f> flipped(cur.rbegin(), cur.rend());
+  const double d0 = mean(*prev, cur);
+  const double d1 = mean(*prev, flipped);
+  (void)max_jump_px;
+  // 姿势差很大时两序的平均位移都会很大，仍选明显更近的那一序
+  if (d1 + 15.0 < d0) {
+    cur.swap(flipped);
+    return true;
+  }
+  return false;
+}
+
+// 采图四元数是 Rz(yaw)*R(-Y, joint_pitch)。eulers(2,1,0) 的 pitch 与关节角反号。
+inline Eigen::Vector3d joint_from_gimbal_euler(const Eigen::Vector3d & ypr_rad)
+{
+  return {ypr_rad[0], -ypr_rad[1], ypr_rad[2]};
+}
+
+// 平面板：角点原点左上。只用于内参。两套手眼都用竖直板，结果才能对照。
 inline std::vector<cv::Point3f> centers_3d_planar(const BoardConfig & c)
 {
   std::vector<cv::Point3f> points;
@@ -206,6 +242,9 @@ inline bool load_intrinsics(
       return false;
     }
 
+    if (yaml["source"] && yaml["source"].as<std::string>() == "remote_hero_untuned") {
+      fmt::print(stderr, "警告: 这是远程英雄旧相机内参，本车重标定前不要用来解手眼\n");
+    }
     if (K.size() != 9) {
       if (err) *err = fmt::format("camera_matrix size {} != 9", K.size());
       return false;

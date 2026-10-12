@@ -1,6 +1,7 @@
 #ifndef LOB_SHOT__LOB_SERIAL_HPP_
 #define LOB_SHOT__LOB_SERIAL_HPP_
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -11,13 +12,14 @@
 namespace lob_shot
 {
 
-// 英雄电控回传（0x5A）
+// 英雄电控回传（0x5A）。curr_yaw / curr_pitch 与 joint_states 相同，单位弧度。
 struct Feedback
 {
   double yaw = 0;
   double pitch = 0;
   double bullet_speed = 0;
   bool ok = false;
+  std::chrono::steady_clock::time_point stamp{};
 };
 
 class ISender

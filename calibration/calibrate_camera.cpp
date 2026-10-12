@@ -39,6 +39,8 @@ int main(int argc, char * argv[])
   cv::Size img_size;
   std::vector<std::vector<cv::Point3f>> obj_points;
   std::vector<std::vector<cv::Point2f>> img_points;
+  std::vector<cv::Point2f> prev_centers;
+  bool have_prev = false;
 
   for (int i = 1; true; i++) {
     auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
@@ -48,6 +50,13 @@ int main(int argc, char * argv[])
 
     std::vector<cv::Point2f> centers;
     bool ok = detector.detect(img, centers, true);
+    if (ok && calib::align_symmetric_180(have_prev ? &prev_centers : nullptr, centers)) {
+      fmt::print("[flip180] {}\n", img_path);
+    }
+    if (ok) {
+      prev_centers = centers;
+      have_prev = true;
+    }
     calib::show_preview(
       preview, img, board.pattern_size(), centers, ok, "calibrate_camera (q skips window focus)");
     fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);

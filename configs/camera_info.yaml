@@ -26,6 +26,7 @@
 #             0.     , 2340.3772 ,  541.3155 ,    0.     ,
 #             0.     ,    0.     ,    1.     ,    0.     ]
 
+source: remote_hero_untuned
 image_width: 1440
 image_height: 1080
 camera_name: narrow_stereo

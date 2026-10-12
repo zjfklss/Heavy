@@ -90,9 +90,10 @@ bool SerialSender::feed_byte(uint8_t b, Feedback & out)
     return false;
   }
   out.ok = true;
-  out.pitch = pkt.curr_pitch;
+  out.pitch = pkt.curr_pitch;  // rad，与英雄 joint_states 一致
   out.yaw = pkt.curr_yaw;
   out.bullet_speed = pkt.bullet_speed;
+  out.stamp = std::chrono::steady_clock::now();
   rx_.clear();
   return true;
 }
@@ -104,10 +105,16 @@ Feedback SerialSender::read_feedback()
   uint8_t buf[256];
   const ssize_t n = ::read(fd_, buf, sizeof(buf));
   if (n <= 0) return out;
+  Feedback last;
+  bool any = false;
   for (ssize_t i = 0; i < n; ++i) {
-    if (feed_byte(buf[i], out)) return out;
+    Feedback one;
+    if (feed_byte(buf[i], one)) {
+      last = one;
+      any = true;
+    }
   }
-  return out;
+  return any ? last : out;
 }
 
 }  // namespace lob_shot

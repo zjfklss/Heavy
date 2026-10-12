@@ -16,6 +16,9 @@ struct Command
   double pitch = 0;     // rad，抬头为正
 };
 
+// 0x5A 的 pitch 是 URDF pitch_joint：绕 (0,-1,0) 的弧度。Z 朝上时该正向就是抬头。
+inline double joint_pitch_to_nose_up(double joint_pitch_rad) { return joint_pitch_rad; }
+
 inline int to_z(const Command & c)
 {
   if (!c.control) return 0;

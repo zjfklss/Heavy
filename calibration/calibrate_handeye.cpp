@@ -1,3 +1,4 @@
+#include <cmath>
 #include <fmt/core.h>
 
 #include <Eigen/Dense>
@@ -28,6 +29,9 @@ void print_yaml(
   result << YAML::BeginMap;
   result << YAML::Key << "R_gimbal2imubody" << YAML::Value << YAML::Flow << R_gimbal2imubody_data;
   result << YAML::Newline << YAML::Newline;
+  result << YAML::Comment(
+    "OpenCV 相机系到云台，直接给 solver。不要再乘 URDF 光学系 -pi/2 0 -pi/2");
+  result << YAML::Newline;
   result << YAML::Comment(fmt::format(
     "相机同理想情况的偏角: yaw {:.2f} pitch {:.2f} roll {:.2f} degree", ypr[0], ypr[1], ypr[2]));
   result << YAML::Key << "R_camera2gimbal" << YAML::Value << YAML::Flow << R_data;
@@ -57,7 +61,7 @@ int main(int argc, char * argv[])
   auto board = calib::load_board_config(config_path);
   double reproj_max = reproj_cli >= 0 ? reproj_cli : board.reproj_max_px;
   calib::CircleGridDetector detector(board);
-  auto obj_template = calib::centers_3d_planar(board);
+  auto obj_template = calib::centers_3d_vertical(board);
 
   cv::Mat camera_matrix, distort_coeffs;
   std::string err;
@@ -73,6 +77,8 @@ int main(int argc, char * argv[])
     board.p_yaw_to_pitch_mm[1], board.p_yaw_to_pitch_mm[2]);
 
   std::vector<cv::Mat> R_gimbal2world_list, t_gimbal2world_list, rvecs, tvecs;
+  std::vector<cv::Point2f> prev_centers;
+  bool have_prev = false;
 
   for (int i = 1; true; i++) {
     auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
@@ -85,15 +91,26 @@ int main(int argc, char * argv[])
     Eigen::Matrix3d R_gimbal2world =
       R_gimbal2imubody.transpose() * R_imubody2imuabs * R_gimbal2imubody;
     Eigen::Vector3d ypr_rad = tools::eulers(R_gimbal2world, 2, 1, 0);
-    Eigen::Vector3d ypr = ypr_rad * 57.3;
+    Eigen::Vector3d joint = calib::joint_from_gimbal_euler(ypr_rad) * 57.3;
+    if (std::abs(ypr_rad[2]) > 2.0 * M_PI / 180.0) {
+      fmt::print("[rejected] {} roll={:.2f}°，姿态不是纯 yaw/pitch\n", img_path, joint[2]);
+      continue;
+    }
 
     auto drawing = img;
-    tools::draw_text(drawing, fmt::format("yaw   {:.2f}", ypr[0]), {40, 40}, {0, 0, 255});
-    tools::draw_text(drawing, fmt::format("pitch {:.2f}", ypr[1]), {40, 80}, {0, 0, 255});
-    tools::draw_text(drawing, fmt::format("roll  {:.2f}", ypr[2]), {40, 120}, {0, 0, 255});
+    tools::draw_text(drawing, fmt::format("joint yaw   {:.2f}", joint[0]), {40, 40}, {0, 0, 255});
+    tools::draw_text(drawing, fmt::format("joint pitch {:.2f}", joint[1]), {40, 80}, {0, 0, 255});
+    tools::draw_text(drawing, fmt::format("roll        {:.2f}", joint[2]), {40, 120}, {0, 0, 255});
 
     std::vector<cv::Point2f> centers;
     bool ok = detector.detect(img, centers, true);
+    if (ok && calib::align_symmetric_180(have_prev ? &prev_centers : nullptr, centers)) {
+      fmt::print("[flip180] {}\n", img_path);
+    }
+    if (ok) {
+      prev_centers = centers;
+      have_prev = true;
+    }
     calib::show_preview(preview, drawing, board.pattern_size(), centers, ok, "calibrate_handeye");
     fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);
     if (!ok) continue;
