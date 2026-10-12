@@ -2,11 +2,16 @@
 
 本仓库是同济 `sp_vision` 上的重装吊射。单独编译、单独运行，不走步兵或哨兵自瞄。弹道只用低抛；高抛角会算出来写进日志，不拿去瞄准。
 
+**操作手请先看：** [docs/操作手速查.md](docs/操作手速查.md)
+
+重装云台很重，打小陀螺必须**钉头**（yaw 钉车中心、窗口开火），不能动头追板。钉头算法已从远程英雄 `jlauto-aim/hero` 的 `processAssessment2` 抄进 `tasks/auto_aim/aimer.cpp`（`nail_mode`，配置见 `configs/heavy_nail.yaml`）。吊射入口与钉头自瞄仍是两套：吊射可 `HEAVY_LOB_ONLY` 干跑；钉头还要相机和全量视觉入口才能上车。
+
 | 位置 | 路径 |
 | --- | --- |
 | 开发机 | `~/jl_sp_vision` |
 | 远程 `jlcv-pc`（`192.168.1.25`） | `/home/jlcv/Heavy` |
 | GitHub | https://github.com/zjfklss/Heavy |
+| 钉头参考（远程英雄） | `/home/jlcv/jlauto-aim/hero/src/solve_angle/src/opti_solver.cpp` |
 
 `jlcv-pc` 上 2026-10-12 已编译通过。离线测试通过，俯仰角 33.27°。`--once` 进入 `READY`。当时没接串口和相机，发送走 `DrySender`。
 

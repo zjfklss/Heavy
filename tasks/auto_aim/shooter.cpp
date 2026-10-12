@@ -22,6 +22,12 @@ bool Shooter::shoot(
 {
   if (!command.control || targets.empty() || !auto_fire_) return false;
 
+  // 钉头模式已在 Aimer 按预测窗口置 shoot；勿再用「跟上跟踪指令」覆盖
+  if (command.shoot && aimer.nail_mode() && aimer.nail_latched()) {
+    last_command_ = command;
+    return true;
+  }
+
   auto target_x = targets.front().ekf_x()[0];
   auto target_y = targets.front().ekf_x()[2];
   auto tolerance = std::sqrt(tools::square(target_x) + tools::square(target_y)) > judge_distance_

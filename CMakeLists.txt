@@ -32,6 +32,22 @@ if(HEAVY_LOB_ONLY)
   add_executable(heavy_lob_offline_test tests/heavy_lob_offline_test.cpp)
   target_include_directories(heavy_lob_offline_test PRIVATE ${PROJECT_SOURCE_DIR}/tasks)
   target_link_libraries(heavy_lob_offline_test PRIVATE lob_shot)
+
+  # 钉头离线：不链 OpenVINO/相机，只验 Aimer::nail_mode
+  find_package(Eigen3 REQUIRED)
+  add_executable(nail_aimer_offline_test
+    tests/nail_aimer_offline_test.cpp
+    tasks/auto_aim/aimer.cpp
+    tasks/auto_aim/target.cpp
+    tools/trajectory.cpp
+    tools/math_tools.cpp
+    tools/extended_kalman_filter.cpp
+    tools/logger.cpp
+  )
+  target_include_directories(nail_aimer_offline_test PRIVATE
+    ${PROJECT_SOURCE_DIR} ${EIGEN3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
+  target_link_libraries(nail_aimer_offline_test PRIVATE
+    yaml-cpp fmt::fmt spdlog::spdlog ${OpenCV_LIBS})
   return()
 endif()
 

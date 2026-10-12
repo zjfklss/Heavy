@@ -38,6 +38,10 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
+nail_mode: false
+nail_spin_on: 1.0
+nail_spin_off: 0.7
+nail_fire_window_deg: 4.0
 yaw_offset: -2 # degree -2.5
 pitch_offset: 0 # degree 2
 comming_angle: 60 # degree
