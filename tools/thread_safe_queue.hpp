@@ -1,6 +1,7 @@
 #ifndef TOOLS__THREAD_SAFE_QUEUE_HPP
 #define TOOLS__THREAD_SAFE_QUEUE_HPP
 
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <iostream>
@@ -49,6 +50,19 @@ public:
 
     value = queue_.front();
     queue_.pop();
+  }
+
+  // 限时取：超时返回 false，避免无帧时主线程卡死、Ctrl+C（Exiter）永远检不到
+  template <class Rep, class Period>
+  bool pop_for(T & value, const std::chrono::duration<Rep, Period> & timeout)
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!not_empty_condition_.wait_for(lock, timeout, [this] { return !queue_.empty(); })) {
+      return false;
+    }
+    value = queue_.front();
+    queue_.pop();
+    return true;
   }
 
   T pop()

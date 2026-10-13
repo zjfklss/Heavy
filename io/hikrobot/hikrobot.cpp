@@ -45,7 +45,12 @@ HikRobot::~HikRobot()
 void HikRobot::read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp)
 {
   CameraData data;
-  queue_.pop(data);
+  // 无相机时旧 pop 会永久阻塞，SIGINT 只置 Exiter 标志却跑不回主循环
+  if (!queue_.pop_for(data, 100ms)) {
+    img = cv::Mat();
+    timestamp = std::chrono::steady_clock::now();
+    return;
+  }
 
   img = data.img;
   timestamp = data.timestamp;
