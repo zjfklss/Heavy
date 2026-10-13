@@ -114,6 +114,7 @@ fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 # 自家英雄 jlcv_serial_driver。mode 在没收到前哨站位时用这个。
 mode: auto_aim
+bullet_speed: 16.5   # 本车统一弹速，不按长短焦改
 serial_port: /dev/ttyUSB0
 baud: 921600
 deploy: false

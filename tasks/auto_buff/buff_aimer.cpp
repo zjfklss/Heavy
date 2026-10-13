@@ -24,8 +24,8 @@ io::Command Aimer::aim(
   io::Command command = {false, false, 0, 0};
   if (target.is_unsolve()) return command;
 
-  // 如果子弹速度小于10，将其设为24
-  if (bullet_speed < 10) bullet_speed = 24;
+  // 同济缺省 24。本车弹速固定 16.5。
+  if (bullet_speed < 10) bullet_speed = 16.5;
 
   auto now = std::chrono::steady_clock::now();
 
@@ -75,9 +75,9 @@ auto_aim::Plan Aimer::mpc_aim(
   if (target.is_unsolve()) return plan;
 
   double bullet_speed;
-  // 如果子弹速度小于10，将其设为24
+  // 同济缺省 24。本车弹速固定 16.5。
   if (gs.bullet_speed < 10)
-    bullet_speed = 24;
+    bullet_speed = 16.5;
   else
     bullet_speed = gs.bullet_speed;
 

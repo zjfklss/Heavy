@@ -93,8 +93,7 @@ void HeroBoard::rx_loop()
       // 与 jlcv_serial_driver 相同：短焦 0、长焦 1
       const int cam = 1 - fb.camera_bit;
       camera_id_ = cam;
-      if (cam == 0 && std::abs(fb.bullet_speed - 12.0) < 0.5) bullet_speed = fb.bullet_speed;
-      else if (cam == 1 && std::abs(fb.bullet_speed - 16.8) < 0.5) bullet_speed = fb.bullet_speed;
+      // 弹速固定 yaml（本车 16.5）。不再按短焦 12 / 长焦 16.8 采纳 0x5A。
       if (fb.reset_tracker) reset_pending_ = true;
       if (yaml_mode_ == Mode::auto_aim || yaml_mode_ == Mode::outpost) {
         mode = fb.outpost ? Mode::outpost : Mode::auto_aim;
