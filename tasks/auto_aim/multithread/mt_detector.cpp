@@ -9,8 +9,9 @@ namespace auto_aim
 namespace multithread
 {
 
-MultiThreadDetector::MultiThreadDetector(const std::string & config_path, bool debug)
-: yolo_(config_path, debug)
+MultiThreadDetector::MultiThreadDetector(
+  const std::string & config_path, bool debug, size_t max_inflight)
+: yolo_(config_path, debug), queue_(max_inflight, [this] { ++dropped_; })
 {
   auto yaml = YAML::LoadFile(config_path);
   auto yolo_name = yaml["yolo_name"].as<std::string>();
@@ -56,36 +57,19 @@ void MultiThreadDetector::push(cv::Mat img, std::chrono::steady_clock::time_poin
   auto roi = cv::Rect(0, 0, w, h);
   cv::resize(img, input(roi), {w, h});
 
-  auto input_port = compiled_model_.input();
   auto infer_request = compiled_model_.create_infer_request();
   ov::Tensor input_tensor(ov::element::u8, {1, 640, 640, 3}, input.data);
 
   infer_request.set_input_tensor(input_tensor);
   infer_request.start_async();
-  queue_.push({img.clone(), t, std::move(infer_request)});
-}
-
-std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point> MultiThreadDetector::pop()
-{
-  auto [img, t, infer_request] = queue_.pop();
-  infer_request.wait();
-
-  // postprocess
-  auto output_tensor = infer_request.get_output_tensor();
-  auto output_shape = output_tensor.get_shape();
-  cv::Mat output(output_shape[1], output_shape[2], CV_32F, output_tensor.data());
-  auto x_scale = static_cast<double>(640) / img.rows;
-  auto y_scale = static_cast<double>(640) / img.cols;
-  auto scale = std::min(x_scale, y_scale);
-  auto armors = yolo_.postprocess(scale, output, img, 0);  //暂不支持ROI
-
-  return {std::move(armors), t};
+  // 相机每帧都是新分配的 Mat，主线程只读，不必 clone
+  queue_.push({img, t, std::move(infer_request), input});
 }
 
 std::tuple<cv::Mat, std::list<Armor>, std::chrono::steady_clock::time_point>
-MultiThreadDetector::debug_pop()
+MultiThreadDetector::finish(Job & job)
 {
-  auto [img, t, infer_request] = queue_.pop();
+  auto & [img, t, infer_request, input] = job;
   infer_request.wait();
 
   // postprocess
@@ -98,6 +82,28 @@ MultiThreadDetector::debug_pop()
   auto armors = yolo_.postprocess(scale, output, img, 0);  //暂不支持ROI
 
   return {img, std::move(armors), t};
+}
+
+std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point> MultiThreadDetector::pop()
+{
+  auto job = queue_.pop();
+  auto [img, armors, t] = finish(job);
+  return {std::move(armors), t};
+}
+
+std::tuple<cv::Mat, std::list<Armor>, std::chrono::steady_clock::time_point>
+MultiThreadDetector::debug_pop()
+{
+  auto job = queue_.pop();
+  return finish(job);
+}
+
+std::optional<std::tuple<cv::Mat, std::list<Armor>, std::chrono::steady_clock::time_point>>
+MultiThreadDetector::debug_pop_for(std::chrono::milliseconds timeout)
+{
+  Job job;
+  if (!queue_.pop_for(job, timeout)) return std::nullopt;
+  return finish(job);
 }
 
 }  // namespace multithread

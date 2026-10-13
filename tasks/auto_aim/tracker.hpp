@@ -14,6 +14,8 @@
 
 namespace auto_aim
 {
+// 目标状态机：lost →(连续 min_detect_count 帧)→ detecting → tracking ⇄ temp_lost（超 max_temp_lost_count 帧回 lost）。
+// track() 会就地删掉非 enemy_color 的装甲；EKF 发散或近期 NIS 失败过多也判 lost。
 class Tracker
 {
 public:

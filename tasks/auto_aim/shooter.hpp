@@ -8,6 +8,8 @@
 
 namespace auto_aim
 {
+// 开火判定：相邻两拍指令 yaw 差 < 2×容差，且云台 yaw 已跟到 < 容差，才置 shoot。
+// 容差按距离分档（> judge_distance 用 second_tolerance）；钉头时改看 Aimer 的开火窗。auto_fire=false 永不开火。
 class Shooter
 {
 public:

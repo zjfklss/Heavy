@@ -9,6 +9,7 @@
 
 namespace tools
 {
+// UDP 发 JSON 给 PlotJuggler（UDP Server，端口 9870）。heavy_standard 经 DebugSink 每帧调一次。
 class Plotter
 {
 public:

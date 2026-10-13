@@ -97,9 +97,11 @@ sudo usermod -a -G dialout $USER
 
 本机远程看 `jlcv-pc` 桌面用它。连接项「英雄小电脑」，地址 `192.168.1.25`，RDP，端口 3389。
 
-#### 3. PlotJuggler
+#### 3. Foxglove Studio（主调试）+ PlotJuggler（备用）
 
-`--loop` 时程序把 JSON 用 UDP 发到 `127.0.0.1:9870`。在小电脑上打开 PlotJuggler，UDP 监听这个端口，能看到 `status`、`yaw_deg`、`pitch_deg`、`z`。
+笔记本装 [Foxglove](https://foxglove.dev/download)，连 `ws://192.168.1.25:8765`，导入 `docs/heavy_foxglove_layout.json`。这是替代旧 rosbridge 的看图/改参方式。
+
+PlotJuggler 仍可在小电脑上 UDP 监听 `127.0.0.1:9870`（`heavy_standard` 默认开；`heavy_lob --loop` 也推吊射曲线）。
 
 #### 4. cutecom
 
@@ -249,15 +251,38 @@ docs/同济上游意见草稿.md                   同济原码问题（#15）
 
 ## 四、调试
 
+上车主入口的调试手感对齐旧 ROS2（`jlauto-aim/hero`）：Foxglove 看图和曲线、yaml 热加载、假串口、录像回放。没有 ROS，没有 foxglove rosbridge。导读：[docs/代码导读.md](docs/代码导读.md)，操作：[docs/操作手速查.md](docs/操作手速查.md) §6。
+
+```bash
+# 首次：下 Foxglove C++ SDK（约 34MB，不进 git），再 cmake
+bash tools/get_foxglove_sdk.sh
+source /opt/intel/openvino_2024.6.0/setupvars.sh
+cmake -B build_full && cmake --build build_full -j$(nproc) --target heavy_standard
+# cmake 应打印 Foxglove SDK: ON
+
+./build_full/heavy_standard configs/heavy_standard.yaml
+# 笔记本 Foxglove 连 ws://192.168.1.25:8765 ，导入 docs/heavy_foxglove_layout.json
+```
+
+| 旧 ROS2 | 现在 |
+| --- | --- |
+| `image_raw` + `/detector/final_img` | Foxglove `/raw` `/vis`（JPEG，默认 15 Hz） |
+| `Latency: xx ms` 叠在 final_img | `/vis` 左上 + `/debug.latency_ms` |
+| `node_params.yaml` 改完免编译 | yaml 存盘 0.5s 热加载；Foxglove 参数面板当场改 |
+| `use_serial:=false` 假关节 | `--fake-board` |
+| `use_video` / `roborts_test` | `--video=records/xxx` 或 `assets/demo/demo` |
+| 生命周期切自瞄/能量 | `--mode=auto_aim\|small_buff\|big_buff\|lob\|idle` |
+| PlotJuggler / rqt | 仍保留 UDP `:9870`；imshow 默认关（`--imshow=true` 才开） |
+
+相机插 USB3。USB2 时海康全幅 Bayer 大约只有 24fps，日志会警告。`fps` 是处理帧率，`cam_fps` 是相机出帧率。
+
+吊射 only（`heavy_lob --loop`）仍向 UDP `9870` 发 `status`/`yaw_deg`/`pitch_deg`/`z`。`--once` 不推曲线。
+
 #### 1. 看日志
 
-程序用 spdlog 打到终端。先看这几项：`sender=`、`status=`、`pitch_deg=`、`z=`、`fire=`。
+程序用 spdlog 打到终端。上车看：`[OV]` 实际设备、`[HikRobot] USB2/USB3`、`[Debug] Foxglove`、`Switch to`、`[热加载]`。
 
-`sender=DrySender (no hardware)` 表示没写串口。`sender=SerialSender` 才是打开了设备。
-
-#### 2. 曲线
-
-只在 `--loop` 时向本机 UDP `9870` 发 JSON。PlotJuggler 收 `status`、`yaw_deg`、`pitch_deg`、`z`。`--once` 只跑一轮，不推曲线。
+吊射看：`sender=`、`status=`、`pitch_deg=`、`z=`、`fire=`。`sender=DrySender` 表示没写串口。
 
 #### 3. 用 gdb
 

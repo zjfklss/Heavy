@@ -77,6 +77,8 @@ struct Lightbar
   Lightbar() {};
 };
 
+// 单块装甲的一次观测。points 为像素角点；*_in_world 由 Solver::solve 填（米 / 弧度）。
+// priority 越小越优先，Tracker 先按它选目标。
 struct Armor
 {
   Color color;

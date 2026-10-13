@@ -91,6 +91,20 @@ add_subdirectory(tasks/omniperception)
 # 全量路径：OpenCV(CLI) + tools（Exiter/Plotter/logger）+ spdlog
 target_link_libraries(heavy_lob PRIVATE lob_shot yaml-cpp fmt::fmt spdlog::spdlog ${OpenCV_LIBS} tools)
 
+# heavy_standard 的调试输出。Foxglove SDK 可选：tools/get_foxglove_sdk.sh 下到 third_party/foxglove，
+# 没有时只剩 PlotJuggler，照样能编能跑。
+find_package(foxglove-sdk CONFIG QUIET HINTS ${PROJECT_SOURCE_DIR}/third_party/foxglove)
+add_library(heavy_debug STATIC tools/debug_sink.cpp)
+target_link_libraries(heavy_debug PUBLIC ${OpenCV_LIBS} yaml-cpp fmt::fmt nlohmann_json::nlohmann_json)
+if(foxglove-sdk_FOUND)
+  foxglove_sdk_add_cpp_library(foxglove_cpp TYPE STATIC)
+  target_link_libraries(heavy_debug PRIVATE foxglove_cpp)
+  target_compile_definitions(heavy_debug PRIVATE HEAVY_FOXGLOVE)
+  message(STATUS "Foxglove SDK: ON")
+else()
+  message(STATUS "Foxglove SDK: OFF（运行 tools/get_foxglove_sdk.sh 后重新 cmake）")
+endif()
+
 ####################src###################
 add_executable(standard src/standard.cpp)
 add_executable(mt_standard src/mt_standard.cpp)
@@ -105,7 +119,7 @@ add_executable(uav_debug src/uav_debug.cpp)
 
 target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-target_link_libraries(heavy_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io lob_shot)
+target_link_libraries(heavy_standard heavy_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io lob_shot)
 target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(mt_auto_aim_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
@@ -169,7 +183,9 @@ target_link_libraries(planner_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim too
 add_executable(planner_test_offline tests/planner_test_offline.cpp)
 target_link_libraries(planner_test_offline ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 
-# 检查 ROS 环境
+# 检查 ROS 环境（默关：本机 Humble 残缺时 QUIET find 仍会 FATAL）
+option(IO_WITH_ROS2 "Compile ROS2 sentry/nav io" OFF)
+if(IO_WITH_ROS2)
 find_package(ament_cmake QUIET)
 find_package(rclcpp QUIET)
 find_package(std_msgs QUIET)
@@ -195,4 +211,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     target_link_libraries(topic_loop_test ${OpenCV_LIBS} fmt::fmt tools io)
 else()
     message(STATUS "ROS2 environment not found, skipping ROS2-related code.")
+endif()
+else()
+    message(STATUS "ROS2 skipped (IO_WITH_ROS2=OFF)")
 endif()

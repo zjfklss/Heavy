@@ -13,6 +13,8 @@
 namespace auto_aim
 {
 
+// 瞄准：EKF 预测到「现在 + 控制延时」，按 comming/leaving_angle 选要打的板，再迭代飞行时间求弹道。
+// 输出 yaw 为世界系；pitch 为同济约定抬头为负（HeroBoard::send 再翻号）。yaw/pitch_offset 单位度。
 struct AimPoint
 {
   bool valid;

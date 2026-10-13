@@ -10,14 +10,11 @@
 namespace io
 {
 
-HeroBoard::HeroBoard(const std::string & config_path)
+HeroBoard::HeroBoard(const std::string & config_path, bool open_serial)
 : bullet_speed(16.5), mode(Mode::auto_aim), queue_(5000)
 {
+  apply_yaml(config_path);
   auto yaml = YAML::LoadFile(config_path);
-  if (yaml["mode"]) mode = parse_mode(yaml["mode"].as<std::string>());
-  yaml_mode_ = mode;
-  if (yaml["bullet_speed"]) bullet_speed = yaml["bullet_speed"].as<double>();
-  if (yaml["deploy"]) deploy_ = yaml["deploy"].as<bool>();
 
   std::string port = "/dev/ttyUSB0";
   int baud = 921600;
@@ -27,8 +24,10 @@ HeroBoard::HeroBoard(const std::string & config_path)
   if (yaml["baud_rate"]) baud = yaml["baud_rate"].as<int>();
 
   serial_ = std::make_unique<lob_shot::SerialSender>(port, baud);
-  const bool opened = serial_->open();
-  if (!opened) {
+  const bool opened = open_serial && serial_->open();
+  if (!open_serial) {
+    tools::logger()->info("[HeroBoard] fake board：不开串口，mode={}", MODES[mode]);
+  } else if (!opened) {
     tools::logger()->warn("[HeroBoard] open {} @{} failed; imu stays identity", port, baud);
   } else {
     tools::logger()->info("[HeroBoard] {} @{} mode={}", port, baud, MODES[mode]);
@@ -51,6 +50,20 @@ HeroBoard::~HeroBoard()
 {
   rx_run_ = false;
   if (rx_.joinable()) rx_.join();
+}
+
+void HeroBoard::apply_yaml(const std::string & config_path)
+{
+  auto yaml = YAML::LoadFile(config_path);
+  if (yaml["mode"]) set_yaml_mode(parse_mode(yaml["mode"].as<std::string>()));
+  if (yaml["bullet_speed"]) bullet_speed = yaml["bullet_speed"].as<double>();
+  if (yaml["deploy"]) deploy_ = yaml["deploy"].as<bool>();
+}
+
+void HeroBoard::set_yaml_mode(Mode m)
+{
+  yaml_mode_ = m;
+  mode = m;
 }
 
 Eigen::Quaterniond HeroBoard::joint_to_q(double yaw, double pitch)

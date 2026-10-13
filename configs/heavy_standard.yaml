@@ -142,3 +142,19 @@ windmill_y: 8.0
 windmill_radius: 1.7
 windmill_z_min: 0.2
 windmill_z_max: 2.8
+
+#####-----调试输出（heavy_standard）-----#####
+# 保存即热加载：image_hz / image_scale / jpeg_quality / raw；其余（端口、imshow、mcap）需重启
+debug:
+  foxglove: true          # 笔记本 Foxglove 连 ws://192.168.1.25:8765
+  foxglove_port: 8765
+  image_hz: 15            # 推图上限；曲线每帧都推
+  image_scale: 0.5        # 推图前缩放
+  jpeg_quality: 75
+  raw: true               # 同时推 /raw 原图（看曝光）
+  imshow: false           # 本机窗口，仅 Remmina 兜底
+  mcap: false             # 录 records/*.mcap，Foxglove 直接打开回看
+  plot: true              # PlotJuggler UDP
+  plot_host: 127.0.0.1
+  plot_port: 9870
+  record_fps: 60          # --record 录 avi 的帧率上限

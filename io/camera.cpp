@@ -36,4 +36,9 @@ void Camera::read(cv::Mat & img, std::chrono::steady_clock::time_point & timesta
   camera_->read(img, timestamp);
 }
 
+void Camera::set_exposure_gain(double exposure_ms, double gain)
+{
+  camera_->set_exposure_gain(exposure_ms, gain);
+}
+
 }  // namespace io

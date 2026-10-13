@@ -16,6 +16,8 @@
 
 namespace auto_buff
 {
+// 打符瞄准：预测到 predict_time + 飞行时间后的扇叶位置求弹道；两发间隔 >= fire_gap_time。
+// pitch 同自瞄，同济约定抬头为负。
 class Aimer
 {
 public:

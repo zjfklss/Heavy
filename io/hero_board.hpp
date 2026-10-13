@@ -24,8 +24,14 @@ public:
   double bullet_speed;
   Mode mode;
 
-  explicit HeroBoard(const std::string & config_path);
+  // open_serial=false：假电控（离线回放/桌面调试），IMU 恒为单位阵、send 空转
+  explicit HeroBoard(const std::string & config_path, bool open_serial = true);
   ~HeroBoard();
+
+  // 热加载：yaml/Foxglove 改 mode、bullet_speed、deploy 时调用。
+  // 电控 0x5A 只能在 auto_aim/outpost 之间切，buff/lob 只能从这里切。
+  void apply_yaml(const std::string & config_path);
+  void set_yaml_mode(Mode m);
 
   Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point timestamp);
   // tongji_pitch：同济世界系抬头为负；英雄 0xA5 抬头为正。吊射已是抬头正，传 false。

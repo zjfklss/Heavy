@@ -10,6 +10,7 @@
 
 namespace tools
 {
+// 线程安全队列。PopWhenFull=false：满了丢新元素（同济默认）；true：丢最旧的，适合只要最新帧的场合。
 template <typename T, bool PopWhenFull = false>
 class ThreadSafeQueue
 {

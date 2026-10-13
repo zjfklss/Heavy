@@ -12,6 +12,8 @@
 const int LOSE_MAX = 20;  // 丢失的阙值
 namespace auto_buff
 {
+// 能量机关检测：YOLO11 关键点模型找扇叶 + R 标，组成 PowerRune（fanblades[0] 为当前要打的扇叶）。
+// 连续丢失 LOSE_MAX 帧才清空历史，短暂遮挡不重置。
 class Buff_Detector
 {
 public:

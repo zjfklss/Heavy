@@ -1,0 +1,257 @@
+{
+  "configById": {
+    "Image!vis": {
+      "imageMode": {
+        "imageTopic": "/vis"
+      },
+      "cameraTopic": "/vis",
+      "enabledMarkerTopics": [],
+      "transformMarkers": false,
+      "synchronize": false,
+      "rotation": 0,
+      "flipHorizontal": false,
+      "flipVertical": false,
+      "smooth": false
+    },
+    "Image!raw": {
+      "imageMode": {
+        "imageTopic": "/raw"
+      },
+      "cameraTopic": "/raw",
+      "enabledMarkerTopics": [],
+      "transformMarkers": false,
+      "synchronize": false,
+      "rotation": 0,
+      "flipHorizontal": false,
+      "flipVertical": false,
+      "smooth": false
+    },
+    "Parameters!params": {
+      "title": "参数（改完即热加载，仅本次运行）"
+    },
+    "Plot!yaw": {
+      "title": "yaw：云台 vs 指令 (deg)",
+      "paths": [
+        {
+          "value": "/debug.gimbal_yaw",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.cmd_yaw",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "Plot!pitch": {
+      "title": "pitch：云台 vs 指令 (deg，同济系抬头为负)",
+      "paths": [
+        {
+          "value": "/debug.gimbal_pitch",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.cmd_pitch",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "Plot!xy": {
+      "title": "观测 vs EKF (m)：看 PnP 跳变",
+      "paths": [
+        {
+          "value": "/debug.armor_x",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.armor_y",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.y",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "Plot!ekf": {
+      "title": "EKF：角速度 w / 半径 r / NIS",
+      "paths": [
+        {
+          "value": "/debug.w",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.r",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.nis",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "Plot!timing": {
+      "title": "帧率与延迟",
+      "paths": [
+        {
+          "value": "/debug.fps",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.cam_fps",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.latency_ms",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "Plot!fire": {
+      "title": "开火：z 0不控/1跟踪/2开火、检出数",
+      "paths": [
+        {
+          "value": "/debug.cmd_z",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.detect_num",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.armor_num",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/debug.nail_latched",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "followingViewWidth": 10
+    },
+    "RawMessages!debug": {
+      "topicPath": "/debug",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "expansion": "all"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "splitPercentage": 55,
+    "first": {
+      "direction": "column",
+      "splitPercentage": 62,
+      "first": "Image!vis",
+      "second": {
+        "direction": "row",
+        "splitPercentage": 50,
+        "first": "Image!raw",
+        "second": {
+          "direction": "row",
+          "splitPercentage": 50,
+          "first": "Parameters!params",
+          "second": "RawMessages!debug"
+        }
+      }
+    },
+    "second": {
+      "direction": "column",
+      "splitPercentage": 34,
+      "first": {
+        "direction": "column",
+        "first": "Plot!yaw",
+        "second": "Plot!pitch"
+      },
+      "second": {
+        "direction": "column",
+        "splitPercentage": 50,
+        "first": {
+          "direction": "column",
+          "first": "Plot!xy",
+          "second": "Plot!ekf"
+        },
+        "second": {
+          "direction": "column",
+          "first": "Plot!timing",
+          "second": "Plot!fire"
+        }
+      }
+    }
+  }
+}

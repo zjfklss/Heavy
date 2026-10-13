@@ -17,6 +17,8 @@
 
 namespace auto_buff
 {
+// 能量机关转动模型：SmallTarget 匀速 π/3 rad/s；BigTarget 正弦变速（RANSAC 拟合转速曲线 + EKF）。
+// Voter 投票判顺/逆时针，防单帧误判翻向。
 class Voter
 {
 public:

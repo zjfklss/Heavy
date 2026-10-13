@@ -1,5 +1,17 @@
 # CHANGELOG · 重装吊射迁同济
 
+## 2026-10-13 · heavy_standard 调试手感（无 ROS Foxglove）
+
+对齐旧 `jlauto-aim/hero` ROS2：Foxglove 看图/曲线/改参，yaml 热加载，假电控，录像回放。推理改同济 `mt_standard` 流水线。
+
+- `src/heavy_standard.cpp`：采集线程 + `MultiThreadDetector`（在途 3 帧）+ DebugSink 异步叠图
+- `tools/debug_sink.*`：`/raw` `/vis` `/debug` + 参数面板；可选 imshow/MCAP；PlotJuggler UDP 仍在
+- `tools/live_config.*`：磁盘 yaml + 面板覆盖合成 `/tmp/heavy_live_*.yaml`
+- CLI：`--mode` `--fake-board` `--video` `--record` `--imshow`
+- 海康启动检测 USB2（~24fps 上限）；`pop_for` 保证 Ctrl+C
+- 布局 `docs/heavy_foxglove_layout.json`；导读 `docs/代码导读.md`
+- Foxglove SDK 可选：`tools/get_foxglove_sdk.sh` → `third_party/foxglove/`（gitignore）
+
 ## 2026-10-12 · heavy_standard 上车骨架
 
 ### 新增

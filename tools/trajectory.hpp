@@ -3,6 +3,7 @@
 
 namespace tools
 {
+// 无空气阻力抛物线：给初速、水平距离、高度差，取低抛解。pitch 抬头为正（Aimer 下发前取负）。
 struct Trajectory
 {
   bool unsolvable;

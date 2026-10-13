@@ -38,7 +38,11 @@ endif()
 
 target_link_libraries(io MvCameraControl MVSDK usb-1.0 yaml-cpp serial lob_shot)
 
-################## 检查 ROS 环境 ##################
+################## 可选 ROS2（heavy_standard 不用；本机 Humble 残缺时 QUIET 仍会 FATAL）##################
+option(IO_WITH_ROS2 "Compile io/ros2 (publish2nav)" OFF)
+if(NOT IO_WITH_ROS2)
+    message(STATUS "ROS2 io skipped (IO_WITH_ROS2=OFF)")
+else()
 find_package(ament_cmake QUIET)
 find_package(rclcpp QUIET)
 find_package(std_msgs QUIET)
@@ -57,4 +61,5 @@ else()
     # 设置 ROS2 依赖
     include_directories(${std_msgs_INCLUDE_DIRS})
     ament_target_dependencies(io rclcpp std_msgs sp_msgs)
+endif()
 endif()

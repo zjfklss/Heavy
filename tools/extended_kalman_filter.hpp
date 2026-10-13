@@ -8,6 +8,8 @@
 
 namespace tools
 {
+// 通用 EKF。update 时把 NIS/NEES 卡方检验结果写进 data（Foxglove /debug 的 nis、nees 曲线），
+// recent_nis_failures 是最近 window_size 次的失败记录，Tracker 用它判跟踪是否已坏。
 class ExtendedKalmanFilter
 {
 public:

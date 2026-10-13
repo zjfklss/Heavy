@@ -5,3 +5,7 @@ logs/
 *.o
 *.a
 .local_fork
+third_party/foxglove/
+records/
+imgs/
+MvSdkLog/

@@ -11,6 +11,9 @@
 namespace lob_shot
 {
 
+// 吊射状态机（不看图，按场地先验坐标）：IDLE → WAITING_POSE → YAW_* → PITCH_* → READY。
+// 永远低抛；低抛 pitch 超 pitch_max_deg 或弹道撞风车 → 回 IDLE（status 写原因）；门闩 module_* 不满足 → INHIBITED。
+// 输出 pitch 抬头为正（英雄约定），heavy_standard 用 send(..., false) 原样下发。
 enum class State
 {
   IDLE,

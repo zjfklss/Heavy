@@ -56,6 +56,35 @@ void HikRobot::read(cv::Mat & img, std::chrono::steady_clock::time_point & times
   timestamp = data.timestamp;
 }
 
+void HikRobot::set_exposure_gain(double exposure_ms, double gain)
+{
+  exposure_us_ = exposure_ms * 1e3;
+  gain_ = gain;
+  // 抓图中可直接改；断线重连时 capture_start 会用新值
+  if (!capturing_) return;
+  set_float_value("ExposureTime", exposure_us_);
+  set_float_value("Gain", gain_);
+  tools::logger()->info("[HikRobot] exposure {:.2f}ms gain {:.1f}", exposure_ms, gain);
+}
+
+void HikRobot::warn_if_usb2()
+{
+  if (speed_checked_ || vid_ == -1 || pid_ == -1) return;
+  speed_checked_ = true;
+  auto handle = libusb_open_device_with_vid_pid(NULL, vid_, pid_);
+  if (!handle) return;
+  const int speed = libusb_get_device_speed(libusb_get_device(handle));
+  libusb_close(handle);
+  // MV-CS016 全幅 Bayer≈1.6MB/帧：USB2 实测只够 ~24fps，USB3 才能上百帧
+  if (speed < LIBUSB_SPEED_SUPER) {
+    tools::logger()->warn(
+      "[HikRobot] 相机在 USB2 口（libusb speed={}），帧率上限约 24fps；请换蓝色/SS 的 USB3 口和线",
+      speed);
+  } else {
+    tools::logger()->info("[HikRobot] USB3 link (libusb speed={})", speed);
+  }
+}
+
 void HikRobot::capture_start()
 {
   capturing_ = false;
@@ -93,6 +122,7 @@ void HikRobot::capture_start()
   set_float_value("ExposureTime", exposure_us_);
   set_float_value("Gain", gain_);
   MV_CC_SetFrameRate(handle_, 150);
+  warn_if_usb2();
 
   ret = MV_CC_StartGrabbing(handle_);
   if (ret != MV_OK) {

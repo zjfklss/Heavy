@@ -53,6 +53,7 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
   device_ = tools::resolve_ov_device(core_, device_);
   compiled_model_ = core_.compile_model(
     model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+  tools::logger()->info("[YOLOV5] compiled on {} (LATENCY)", device_);
 }
 
 std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)

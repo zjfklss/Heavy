@@ -14,6 +14,9 @@
 namespace auto_aim
 {
 
+// 整车 EKF。x = [x vx y vy z vz a w r l h]：车心位置/速度，朝向 a，角速度 w（下标 7），
+// 半径 r；四板车的 1、3 号板用 r+l、z+h（长短轴与高低差）。模型：匀速平移 + 匀速自转。
+// armor_xyza_list() 由状态反推每块板的世界坐标与朝向。
 class Target
 {
 public:

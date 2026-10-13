@@ -10,6 +10,8 @@
 #include "tools/thread_safe_queue.hpp"
 namespace tools
 {
+// 录 records/<时间>.avi（MJPG）+ .txt（每行 t w x y z，t 为相对秒）。
+// 后台线程写盘，队列满丢新帧；txt 带真实时间戳，回放（tools::Replay / tests/auto_aim_test）按它对齐 IMU。
 class Recorder
 {
 public:

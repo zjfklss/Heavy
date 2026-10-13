@@ -13,6 +13,8 @@
 
 namespace auto_aim
 {
+// 同步单帧推理（LATENCY）。heavy_standard 走 multithread::MultiThreadDetector 流水线，只借这里的 postprocess。
+// use_traditional：在 YOLO 框内再用传统灯条法修角点，PnP 更稳。
 class YOLOV5 : public YOLOBase
 {
 public:

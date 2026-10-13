@@ -14,6 +14,7 @@ namespace auto_buff
 // 旋转角度
 const double THETA = 2.0 * CV_PI / 5.0;  // 2/5π
 
+// 能量机关 PnP：与自瞄共用相机内参和手眼标定，解出 R 标与目标扇叶在世界系的位置。
 class Solver
 {
 public:
