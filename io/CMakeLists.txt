@@ -16,14 +16,21 @@ add_library(io STATIC
     gimbal/gimbal.cpp
 )
 
-# hikrobot
+# hikrobot。装了 /opt/MVS 就用它：仓库自带的 libMvCameraControl 较旧，USB3 枚举会返回 MV_E_RESOURCE。
 target_include_directories(io PUBLIC hikrobot/include)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
-  target_link_directories(io PUBLIC hikrobot/lib/amd64)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  target_link_directories(io PUBLIC hikrobot/lib/arm64)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" AND EXISTS "/opt/MVS/lib/64/libMvCameraControl.so")
+  set(MV_CAMERA_LIB "/opt/MVS/lib/64/libMvCameraControl.so")
+  message(STATUS "Hikrobot SDK: /opt/MVS")
 else()
-  message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
+  set(MV_CAMERA_LIB MvCameraControl)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+    target_link_directories(io PUBLIC hikrobot/lib/amd64)
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    target_link_directories(io PUBLIC hikrobot/lib/arm64)
+  else()
+    message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
+  endif()
+  message(STATUS "Hikrobot SDK: bundled")
 endif()
 
 # mindvision
@@ -36,7 +43,7 @@ else()
   message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
 endif()
 
-target_link_libraries(io MvCameraControl MVSDK usb-1.0 yaml-cpp serial lob_shot)
+target_link_libraries(io ${MV_CAMERA_LIB} MVSDK usb-1.0 yaml-cpp serial lob_shot)
 
 ################## 可选 ROS2（heavy_standard 不用；本机 Humble 残缺时 QUIET 仍会 FATAL）##################
 option(IO_WITH_ROS2 "Compile io/ros2 (publish2nav)" OFF)
