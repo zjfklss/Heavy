@@ -66,7 +66,8 @@ io::Command Aimer::aim(
   const double abs_w = std::abs(target.ekf_x()[kIdxW]);
   double delay_time = abs_w > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
-  if (bullet_speed < 14) bullet_speed = 23;
+  // 同济步兵把 <14 当成「串口没报弹速」改成 23。英雄短焦合法约 12，门槛降到 10，缺省用 yaml 的 16.5。
+  if (bullet_speed < 10) bullet_speed = 16.5;
 
   auto future = timestamp;
   if (to_now) {
