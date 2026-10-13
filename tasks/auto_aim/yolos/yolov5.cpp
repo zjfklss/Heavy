@@ -7,6 +7,7 @@
 
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
+#include "tools/ov_device.hpp"
 
 namespace auto_aim
 {
@@ -48,8 +49,8 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
     .convert_color(ov::preprocess::ColorFormat::RGB)
     .scale(255.0);
 
-  // TODO: ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)
   model = ppp.build();
+  device_ = tools::resolve_ov_device(core_, device_);
   compiled_model_ = core_.compile_model(
     model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
 }

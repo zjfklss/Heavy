@@ -9,7 +9,8 @@ classify_model: assets/tiny_resnet.onnx
 yolo11_model_path: assets/yolo11.xml
 yolov8_model_path: assets/yolov8.xml
 yolov5_model_path: assets/yolov5.xml
-device: GPU
+# jlcv-pc OpenVINO 仅有 CPU（无 Intel GPU 驱动时勿写 GPU，否则直接 abort）
+device: CPU
 min_confidence: 0.8
 use_traditional: true
 
