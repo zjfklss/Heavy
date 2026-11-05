@@ -13,8 +13,6 @@
 
 namespace auto_aim
 {
-// 同步单帧推理（LATENCY）。heavy_standard 走 multithread::MultiThreadDetector 流水线，只借这里的 postprocess。
-// use_traditional：在 YOLO 框内再用传统灯条法修角点，PnP 更稳。
 class YOLOV5 : public YOLOBase
 {
 public:
@@ -28,7 +26,7 @@ public:
 private:
   std::string device_, model_path_;
   std::string save_path_, debug_path_;
-  bool debug_, use_roi_, use_traditional_;
+  bool debug_, use_roi_;
 
   const int class_num_ = 13;
   const float nms_threshold_ = 0.3;
@@ -54,6 +52,7 @@ private:
 
   void save(const Armor & armor) const;
   void draw_detections(const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const;
+  void sort_keypoints(std::vector<cv::Point2f> & keypoints);
   double sigmoid(double x);
 };
 

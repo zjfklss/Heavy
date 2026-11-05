@@ -11,6 +11,17 @@
 
 namespace auto_aim
 {
+class Voter
+{
+public:
+  Voter();
+  void vote(const Color color, const ArmorName name, const ArmorType type);
+  std::size_t count(const Color color, const ArmorName name, const ArmorType type);
+
+private:
+  std::vector<std::size_t> count_;
+  std::size_t index(const Color color, const ArmorName name, const ArmorType type) const;
+};
 
 class Detector
 {
@@ -19,11 +30,8 @@ public:
 
   std::list<Armor> detect(const cv::Mat & bgr_img, int frame_count = -1);
 
-  bool detect(Armor & armor, const cv::Mat & bgr_img);
-
-  friend class YOLOV8;
-
 private:
+  Voter voter_;
   Classifier classifier_;
 
   double threshold_;
@@ -37,9 +45,6 @@ private:
 
   bool debug_;
   std::string save_path_;
-
-  // 利用PCA回归角点，参考自https://github.com/CSU-FYT-Vision/FYT2024_vision
-  void lightbar_points_corrector(Lightbar & lightbar, const cv::Mat & gray_img) const;
 
   bool check_geometry(const Lightbar & lightbar) const;
   bool check_geometry(const Armor & armor) const;

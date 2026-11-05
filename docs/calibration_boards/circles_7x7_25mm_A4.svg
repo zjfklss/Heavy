@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297">
+<title>BOARD A | 7 x 7 | 25 mm pitch | A4</title>
+<desc>Symmetric circle grid. Black circles on white. Pitch 25 mm; diameter 12.5 mm. Verify physical dimensions after printing.</desc>
+<rect width="210" height="297" fill="white"/>
+<text x="105" y="20" text-anchor="middle" font-family="sans-serif" font-size="4.5">BOARD A | 7 x 7 | 25 mm pitch | A4</text>
+<text x="105" y="32" text-anchor="middle" font-family="sans-serif" font-size="3.3">Print at 100% / Actual size. Disable Fit to page.</text>
+<text x="105" y="258" text-anchor="middle" font-family="sans-serif" font-size="3.3">Verify horizontal AND vertical centre spacing with a ruler.</text>
+<circle cx="30" cy="65" r="6.25" fill="black"/>
+<circle cx="55" cy="65" r="6.25" fill="black"/>
+<circle cx="80" cy="65" r="6.25" fill="black"/>
+<circle cx="105" cy="65" r="6.25" fill="black"/>
+<circle cx="130" cy="65" r="6.25" fill="black"/>
+<circle cx="155" cy="65" r="6.25" fill="black"/>
+<circle cx="180" cy="65" r="6.25" fill="black"/>
+<circle cx="30" cy="90" r="6.25" fill="black"/>
+<circle cx="55" cy="90" r="6.25" fill="black"/>
+<circle cx="80" cy="90" r="6.25" fill="black"/>
+<circle cx="105" cy="90" r="6.25" fill="black"/>
+<circle cx="130" cy="90" r="6.25" fill="black"/>
+<circle cx="155" cy="90" r="6.25" fill="black"/>
+<circle cx="180" cy="90" r="6.25" fill="black"/>
+<circle cx="30" cy="115" r="6.25" fill="black"/>
+<circle cx="55" cy="115" r="6.25" fill="black"/>
+<circle cx="80" cy="115" r="6.25" fill="black"/>
+<circle cx="105" cy="115" r="6.25" fill="black"/>
+<circle cx="130" cy="115" r="6.25" fill="black"/>
+<circle cx="155" cy="115" r="6.25" fill="black"/>
+<circle cx="180" cy="115" r="6.25" fill="black"/>
+<circle cx="30" cy="140" r="6.25" fill="black"/>
+<circle cx="55" cy="140" r="6.25" fill="black"/>
+<circle cx="80" cy="140" r="6.25" fill="black"/>
+<circle cx="105" cy="140" r="6.25" fill="black"/>
+<circle cx="130" cy="140" r="6.25" fill="black"/>
+<circle cx="155" cy="140" r="6.25" fill="black"/>
+<circle cx="180" cy="140" r="6.25" fill="black"/>
+<circle cx="30" cy="165" r="6.25" fill="black"/>
+<circle cx="55" cy="165" r="6.25" fill="black"/>
+<circle cx="80" cy="165" r="6.25" fill="black"/>
+<circle cx="105" cy="165" r="6.25" fill="black"/>
+<circle cx="130" cy="165" r="6.25" fill="black"/>
+<circle cx="155" cy="165" r="6.25" fill="black"/>
+<circle cx="180" cy="165" r="6.25" fill="black"/>
+<circle cx="30" cy="190" r="6.25" fill="black"/>
+<circle cx="55" cy="190" r="6.25" fill="black"/>
+<circle cx="80" cy="190" r="6.25" fill="black"/>
+<circle cx="105" cy="190" r="6.25" fill="black"/>
+<circle cx="130" cy="190" r="6.25" fill="black"/>
+<circle cx="155" cy="190" r="6.25" fill="black"/>
+<circle cx="180" cy="190" r="6.25" fill="black"/>
+<circle cx="30" cy="215" r="6.25" fill="black"/>
+<circle cx="55" cy="215" r="6.25" fill="black"/>
+<circle cx="80" cy="215" r="6.25" fill="black"/>
+<circle cx="105" cy="215" r="6.25" fill="black"/>
+<circle cx="130" cy="215" r="6.25" fill="black"/>
+<circle cx="155" cy="215" r="6.25" fill="black"/>
+<circle cx="180" cy="215" r="6.25" fill="black"/>
+<path d="M 55 270 H 155 M 55 268 v 4 M 155 268 v 4" fill="none" stroke="black" stroke-width="0.3"/>
+<text x="105" y="277" text-anchor="middle" font-family="sans-serif" font-size="3.3">100 mm reference length</text>
+</svg>

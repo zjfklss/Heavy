@@ -2,6 +2,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <iostream>
+
 #include "yolos/yolo11.hpp"
 #include "yolos/yolov5.hpp"
 #include "yolos/yolov8.hpp"
@@ -30,13 +32,9 @@ YOLO::YOLO(const std::string & config_path, bool debug)
   }
 }
 
-std::list<Armor> YOLO::detect(const cv::Mat & img, int frame_count)
-{
-  return yolo_->detect(img, frame_count);
-}
+std::list<Armor> YOLO::detect(const cv::Mat & img, int frame_count) { return yolo_->detect(img, frame_count); }
 
-std::list<Armor> YOLO::postprocess(
-  double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
+std::list<Armor> YOLO::postprocess(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
 {
   return yolo_->postprocess(scale, output, bgr_img, frame_count);
 }

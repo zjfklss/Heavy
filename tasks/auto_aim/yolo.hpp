@@ -7,15 +7,12 @@
 
 namespace auto_aim
 {
-// 装甲检测入口：按 yaml yolo_name 选 yolov5/yolov8/yolo11。
-// 输出只有像素层信息（4 角点、颜色、数字、置信度），3D 由 Solver 填。
 class YOLOBase
 {
 public:
   virtual std::list<Armor> detect(const cv::Mat & img, int frame_count) = 0;
 
-  virtual std::list<Armor> postprocess(
-    double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count) = 0;
+  virtual std::list<Armor> postprocess(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count) = 0;
 };
 
 class YOLO
@@ -25,8 +22,7 @@ public:
 
   std::list<Armor> detect(const cv::Mat & img, int frame_count = -1);
 
-  std::list<Armor> postprocess(
-    double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count);
+  std::list<Armor> postprocess(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count);
 
 private:
   std::unique_ptr<YOLOBase> yolo_;

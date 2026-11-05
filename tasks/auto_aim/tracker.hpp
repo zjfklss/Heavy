@@ -7,49 +7,45 @@
 #include <string>
 
 #include "armor.hpp"
+#include "io/mode.hpp"
 #include "solver.hpp"
 #include "target.hpp"
-#include "tasks/omniperception/perceptron.hpp"
-#include "tools/thread_safe_queue.hpp"
 
 namespace auto_aim
 {
-// 目标状态机：lost →(连续 min_detect_count 帧)→ detecting → tracking ⇄ temp_lost（超 max_temp_lost_count 帧回 lost）。
-// track() 会就地删掉非 enemy_color 的装甲；EKF 发散或近期 NIS 失败过多也判 lost。
 class Tracker
 {
 public:
   Tracker(const std::string & config_path, Solver & solver);
 
-  std::string state() const;
+  bool state();
+  std::string state_str();
+  Target get_target();
+  void set_enemy_color(Color color) { enemy_color_ = color; }
 
   std::list<Target> track(
-    std::list<Armor> & armors, std::chrono::steady_clock::time_point t,
-    bool use_enemy_color = true);
-
-  std::tuple<omniperception::DetectionResult, std::list<Target>> track(
-    const std::vector<omniperception::DetectionResult> & detection_queue, std::list<Armor> & armors,
-    std::chrono::steady_clock::time_point t, bool use_enemy_color = true);
+    std::list<Armor> & armors, std::chrono::steady_clock::time_point t, double yaw, bool use_enemy_color = true,
+    io::Mode mode = io::Mode::auto_aim);
 
 private:
+  const static int ENEMY_NUM = 8;
   Solver & solver_;
   Color enemy_color_;
-  int min_detect_count_;
-  int max_temp_lost_count_;
-  int detect_count_;
-  int temp_lost_count_;
-  int outpost_max_temp_lost_count_;
-  int normal_temp_lost_count_;
-  std::string state_, pre_state_;
   Target target_;
   std::chrono::steady_clock::time_point last_timestamp_;
-  ArmorPriority omni_target_priority_;
+  io::Mode last_mode_ = io::Mode::idle;
+  Target targets_[ENEMY_NUM];
+  int last_target_name_ = -1; // -1 for none
 
   void state_machine(bool found);
 
-  bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
+  bool set_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t, io::Mode mode);
 
   bool update_target(std::list<Armor> & armors, std::chrono::steady_clock::time_point t);
+
+  bool update_targets(std::list<Armor> & armors, std::chrono::steady_clock::time_point t, double yaw);
+
+  void clear_targets();
 };
 
 }  // namespace auto_aim

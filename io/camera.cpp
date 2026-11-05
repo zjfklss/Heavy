@@ -1,44 +1,25 @@
 #include "camera.hpp"
 
 #include <stdexcept>
-
+#include <yaml-cpp/yaml.h>
+#ifdef HERO_WITH_MVS
 #include "hikrobot/hikrobot.hpp"
-#include "mindvision/mindvision.hpp"
-#include "tools/yaml.hpp"
+#endif
 
 namespace io
 {
 Camera::Camera(const std::string & config_path)
 {
-  auto yaml = tools::load(config_path);
-  auto camera_name = tools::read<std::string>(yaml, "camera_name");
-  auto exposure_ms = tools::read<double>(yaml, "exposure_ms");
-
-  if (camera_name == "mindvision") {
-    auto gamma = tools::read<double>(yaml, "gamma");
-    auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
-    camera_ = std::make_unique<MindVision>(exposure_ms, gamma, vid_pid);
-  }
-
-  else if (camera_name == "hikrobot") {
-    auto gain = tools::read<double>(yaml, "gain");
-    auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
-    camera_ = std::make_unique<HikRobot>(exposure_ms, gain, vid_pid);
-  }
-
-  else {
-    throw std::runtime_error("Unknow camera_name: " + camera_name + "!");
-  }
+#ifdef HERO_WITH_MVS
+  const auto config = YAML::LoadFile(config_path);
+  camera_ = std::make_unique<HikRobot>(config["exposure_ms"].as<double>(),
+    config["gain"].as<double>(), "", config["fps"].as<double>(), HikRobotSettings::load(config));
+#else
+  throw std::runtime_error("Build with Hikrobot MVS to use a live camera");
+#endif
 }
-
-void Camera::read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp)
+void Camera::read(cv::Mat & image, std::chrono::steady_clock::time_point & stamp)
 {
-  camera_->read(img, timestamp);
+  camera_->read(image, stamp);
 }
-
-void Camera::set_exposure_gain(double exposure_ms, double gain)
-{
-  camera_->set_exposure_gain(exposure_ms, gain);
 }
-
-}  // namespace io

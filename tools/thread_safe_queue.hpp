@@ -1,16 +1,16 @@
 #ifndef TOOLS__THREAD_SAFE_QUEUE_HPP
 #define TOOLS__THREAD_SAFE_QUEUE_HPP
 
-#include <chrono>
 #include <condition_variable>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 
 namespace tools
 {
-// 线程安全队列。PopWhenFull=false：满了丢新元素（同济默认）；true：丢最旧的，适合只要最新帧的场合。
 template <typename T, bool PopWhenFull = false>
 class ThreadSafeQueue
 {
@@ -24,6 +24,7 @@ public:
   void push(const T & value)
   {
     std::unique_lock<std::mutex> lock(mutex_);
+    if (closed_) return;
 
     if (queue_.size() >= max_size_) {
       if (PopWhenFull) {
@@ -42,26 +43,23 @@ public:
   {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
+    not_empty_condition_.wait(lock, [this] { return closed_ || !queue_.empty(); });
 
     if (queue_.empty()) {
-      std::cerr << "Error: Attempt to pop from an empty queue." << std::endl;
-      return;
+      throw std::runtime_error("Queue closed");
     }
 
     value = queue_.front();
     queue_.pop();
   }
 
-  // 限时取：超时返回 false，避免无帧时主线程卡死、Ctrl+C（Exiter）永远检不到
-  template <class Rep, class Period>
-  bool pop_for(T & value, const std::chrono::duration<Rep, Period> & timeout)
+  template <typename Rep, typename Period>
+  bool try_pop_for(T & value, const std::chrono::duration<Rep, Period> & timeout)
   {
     std::unique_lock<std::mutex> lock(mutex_);
-    if (!not_empty_condition_.wait_for(lock, timeout, [this] { return !queue_.empty(); })) {
+    if (!not_empty_condition_.wait_for(lock, timeout, [this] { return closed_ || !queue_.empty(); }) || queue_.empty())
       return false;
-    }
-    value = queue_.front();
+    value = std::move(queue_.front());
     queue_.pop();
     return true;
   }
@@ -70,7 +68,8 @@ public:
   {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
+    not_empty_condition_.wait(lock, [this] { return closed_ || !queue_.empty(); });
+    if (queue_.empty()) throw std::runtime_error("Queue closed");
 
     T value = std::move(queue_.front());
     queue_.pop();
@@ -113,7 +112,15 @@ public:
     not_empty_condition_.notify_all();  // 如果其他线程正在等待队列不为空，这样可以唤醒它们
   }
 
+  void close()
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    closed_ = true;
+    not_empty_condition_.notify_all();
+  }
+
 private:
+  bool closed_ = false;
   std::queue<T> queue_;
   size_t max_size_;
   mutable std::mutex mutex_;

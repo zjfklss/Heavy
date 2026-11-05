@@ -3,13 +3,11 @@
 
 #include <netinet/in.h>  // sockaddr_in
 
-#include <mutex>
-#include <nlohmann/json.hpp>
 #include <string>
+#include <nlohmann/json.hpp>
 
 namespace tools
 {
-// UDP 发 JSON 给 PlotJuggler（UDP Server，端口 9870）。heavy_standard 经 DebugSink 每帧调一次。
 class Plotter
 {
 public:
@@ -22,7 +20,6 @@ public:
 private:
   int socket_;
   sockaddr_in destination_;
-  std::mutex mutex_;
 };
 
 }  // namespace tools

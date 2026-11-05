@@ -1,11 +1,12 @@
 build/
-build_lob/
-build_full/
+build-*/
 logs/
 *.o
 *.a
 .local_fork
-third_party/foxglove/
 records/
 imgs/
 MvSdkLog/
+datasets/
+/third_party/foxglove/
+/$(ALLUSERSPROFILE)/
