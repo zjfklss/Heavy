@@ -4,17 +4,17 @@
 #include <Eigen/Dense>
 #include <deque>
 #include <functional>
-#include <map>
 
 namespace tools
 {
-// 通用 EKF。update 时把 NIS/NEES 卡方检验结果写进 data（Foxglove /debug 的 nis、nees 曲线），
-// recent_nis_failures 是最近 window_size 次的失败记录，Tracker 用它判跟踪是否已坏。
 class ExtendedKalmanFilter
 {
 public:
   Eigen::VectorXd x;
   Eigen::MatrixXd P;
+  bool use_adaptive_R = false;
+  double smooth = 0.995;  // 平滑系数
+  Eigen::MatrixXd R_adaptive;
 
   ExtendedKalmanFilter() = default;
 
@@ -26,8 +26,7 @@ public:
   Eigen::VectorXd predict(const Eigen::MatrixXd & F, const Eigen::MatrixXd & Q);
 
   Eigen::VectorXd predict(
-    const Eigen::MatrixXd & F, const Eigen::MatrixXd & Q,
-    std::function<Eigen::VectorXd(const Eigen::VectorXd &)> f);
+    const Eigen::MatrixXd & F, const Eigen::MatrixXd & Q, std::function<Eigen::VectorXd(const Eigen::VectorXd &)> f);
 
   Eigen::VectorXd update(
     const Eigen::VectorXd & z, const Eigen::MatrixXd & H, const Eigen::MatrixXd & R,
@@ -40,8 +39,7 @@ public:
     std::function<Eigen::VectorXd(const Eigen::VectorXd &, const Eigen::VectorXd &)> z_subtract =
       [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) { return a - b; });
 
-  std::map<std::string, double> data;  //卡方检验数据
-  std::deque<int> recent_nis_failures{0};
+  std::deque<int> recent_nis_failures;
   size_t window_size = 100;
   double last_nis;
 

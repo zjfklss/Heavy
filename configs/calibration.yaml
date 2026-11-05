@@ -1,5 +1,5 @@
 # 主路径：英雄对称小圆点板 7×7 @ 25mm（白底黑点）
-# 大板见 calibration_legacy_10x7.yaml
+# 大板见 calibration_10x7.yaml
 
 pattern_cols: 7
 pattern_rows: 7

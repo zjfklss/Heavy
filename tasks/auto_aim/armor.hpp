@@ -8,45 +8,16 @@
 
 namespace auto_aim
 {
-enum Color
-{
-  red,
-  blue,
-  extinguish,
-  purple
-};
+enum Color { red, blue, extinguish, purple };
 const std::vector<std::string> COLORS = {"red", "blue", "extinguish", "purple"};
 
-enum ArmorType
-{
-  big,
-  small
-};
+enum ArmorType { big, small };
 const std::vector<std::string> ARMOR_TYPES = {"big", "small"};
 
-enum ArmorName
-{
-  one,
-  two,
-  three,
-  four,
-  five,
-  sentry,
-  outpost,
-  base,
-  not_armor
-};
-const std::vector<std::string> ARMOR_NAMES = {"one",    "two",     "three", "four",     "five",
-                                              "sentry", "outpost", "base",  "not_armor"};
+enum ArmorName { one, two, three, four, five, sentry, outpost, base, not_armor };
+const std::vector<std::string> ARMOR_NAMES = {"one", "two", "three", "four", "five", "sentry", "outpost", "base", "not_armor"};
 
-enum ArmorPriority
-{
-  first = 1,
-  second,
-  third,
-  forth,
-  fifth
-};
+enum ArmorPriority { first = 1, second, third, forth, fifth };
 
 // clang-format off
 const std::vector<std::tuple<Color, ArmorName, ArmorType>> armor_properties = {
@@ -77,8 +48,6 @@ struct Lightbar
   Lightbar() {};
 };
 
-// 单块装甲的一次观测。points 为像素角点；*_in_world 由 Solver::solve 填（米 / 弧度）。
-// priority 越小越优先，Tracker 先按它选目标。
 struct Armor
 {
   Color color;
@@ -109,17 +78,12 @@ struct Armor
   double yaw_raw;  // rad
 
   Armor(const Lightbar & left, const Lightbar & right);
+  Armor(int class_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints);
+  Armor(int class_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints, cv::Point2f offset);
+  Armor(int color_id, int num_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints);
   Armor(
-    int class_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints);
-  Armor(
-    int class_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints,
+    int color_id, int num_id, float confidence, const cv::Rect & box, std::vector<cv::Point2f> armor_keypoints,
     cv::Point2f offset);
-  Armor(
-    int color_id, int num_id, float confidence, const cv::Rect & box,
-    std::vector<cv::Point2f> armor_keypoints);
-  Armor(
-    int color_id, int num_id, float confidence, const cv::Rect & box,
-    std::vector<cv::Point2f> armor_keypoints, cv::Point2f offset);
 };
 
 }  // namespace auto_aim

@@ -11,7 +11,6 @@
 #include "tasks/auto_aim/classifier.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
-#include "tools/ov_device.hpp"
 
 namespace auto_aim
 {
@@ -53,8 +52,8 @@ YOLOV8::YOLOV8(const std::string & config_path, bool debug)
     .convert_color(ov::preprocess::ColorFormat::RGB)
     .scale(255.0);
 
+  // TODO: ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)
   model = ppp.build();
-  device_ = tools::resolve_ov_device(core_, device_);
   compiled_model_ = core_.compile_model(
     model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
 }
@@ -191,7 +190,7 @@ bool YOLOV8::check_name(const Armor & armor) const
   auto confidence_ok = armor.confidence > min_confidence_;
 
   // 保存不确定的图案，用于分类器的迭代
-  // if (name_ok && !confidence_ok) save(armor);
+  if (name_ok && !confidence_ok) save(armor);
 
   return name_ok && confidence_ok;
 }
@@ -204,7 +203,7 @@ bool YOLOV8::check_type(const Armor & armor) const
                       armor.name != ArmorName::outpost);
 
   // 保存异常的图案，用于分类器的迭代
-  // if (!name_ok) save(armor);
+  if (!name_ok) save(armor);
 
   return name_ok;
 }
@@ -270,7 +269,7 @@ cv::Mat YOLOV8::get_pattern(const cv::Mat & bgr_img, const Armor & armor) const
 void YOLOV8::save(const Armor & armor) const
 {
   auto file_name = fmt::format("{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
-  auto img_path = fmt::format("{}/{}_{}.jpg", save_path_, armor.name, file_name);
+  auto img_path = fmt::format("{}/{}_{}.jpg", save_path_, static_cast<int>(armor.name), file_name);
   cv::imwrite(img_path, armor.pattern);
 }
 

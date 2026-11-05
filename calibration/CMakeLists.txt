@@ -1,0 +1,5 @@
+foreach(target calibrate_camera calibrate_handeye calibrate_robotworld_handeye)
+  add_executable(${target} ${target}.cpp)
+  target_link_libraries(${target} PRIVATE tools)
+  set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+endforeach()

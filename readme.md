@@ -1,431 +1,242 @@
-# 重装视觉（同济壳 · 英雄电控）
+# 英雄视觉：工程说明与相机标定教程
 
-同济 `sp_vision` 无 ROS 壳上的重装栈：吊射永远低抛；自瞄默认**钉头**（小陀螺不追板）。电控是自家英雄 `0xA5/0x5A`，不是同济 CAN/SP。
+本分支以本机 `sp_jlcv_aimer` 的目录分层为基准：`src` 放入口，`io` 放硬件适配，`tasks` 放算法，`tools` 放公共工具，`configs` 和 `assets` 放配置及模型。原先嵌套在 `tongji_hero/` 的当前程序已归入这些目录。
 
-**操作手请先看：** [docs/操作手速查.md](docs/操作手速查.md)
+原有 Heavy 的吊射、钉头、打符、哨兵等入口，以及对应配置、模型、启动脚本和文档已退出当前工作区。`sp_jlcv_aimer` 与 `jlauto-aim` 两个独立仓库不属于此次清理范围。
 
-| 入口 | 用途 |
+本文提供工程结构、环境准备、离线内参标定、两种标定板和故障排查教程。handeye 部分说明通用原理、数据约定及现有实现限制，不提供该发射平台的实机手眼操作、瞄准外参接入或射击教程。
+
+## 1. 阅读路线
+
+| 目的 | 阅读位置 |
 | --- | --- |
-| `heavy_standard` | **上车主入口**（短焦自瞄/打符/吊射），全量编译 |
-| `heavy_lob` | 只吊射；`HEAVY_LOB_ONLY` 可无 OpenVINO 干跑 |
+| 了解结构和构建 | 本文第 2～4 节 |
+| 选择、打印标定板 | 本文第 5 节 |
+| 内参拍摄、整理、解算和检查 | 本文第 6 节；[详细教程](docs/圆点标定操作流程.md) |
+| 理解 handeye | 本文第 7 节；详细教程第 9 节 |
+| 查看相机检查与来源记录 | [英雄入口说明](docs/hero.md) |
 
-本轮只做短焦。钉头在 `tasks/auto_aim/aimer.cpp`（`nail_mode`）；配置见 `configs/heavy_standard.yaml` / `heavy_nail.yaml`。
+命令默认从本仓库根目录执行，克隆目录不同则替换路径：
 
-| 位置 | 路径 |
-| --- | --- |
-| 开发机 | `~/jl_sp_vision` |
-| 远程 `jlcv-pc`（`192.168.1.25`） | `/home/jlcv/Heavy`（已接 GitHub） |
-| GitHub | https://github.com/zjfklss/Heavy |
-| 钉头参考 | 远程 `jlauto-aim/hero` · `processAssessment2` |
-| 串口参考 | 远程 `jlauto-aim/hero` · `jlcv_serial_driver` |
+```bash
+cd ~/Heavy
+git status --short --branch
+```
 
-`jlcv-pc`：离线测 pitch≈33.27°；`build_full/heavy_standard` 已编过。短焦内参仍是占位，上场前用圆点标定替换。
+## 2. 目录与模块
 
-## 一、本项目依赖安装（统一用 Ubuntu 22.04）
+```text
+Heavy/
+├── CMakeLists.txt                 根构建入口
+├── src/hero.cpp                   当前英雄程序入口
+├── io/
+│   ├── CMakeLists.txt             相机模块
+│   ├── camera.*                   相机接口
+│   ├── hikrobot/                  当前海康驱动
+│   └── hero/                     英雄接口与配置校验
+├── tasks/
+│   ├── auto_aim/                  当前视觉算法
+│   └── auto_outpost/              当前前哨站模块
+├── tools/                        公共工具与独立 CMake 目标
+├── configs/
+│   ├── hero.yaml                  当前入口配置
+│   ├── calibration.yaml           7×7、25 mm 板配置
+│   ├── calibration_10x7.yaml       10×7、40 mm 板配置
+│   └── camera_info.yaml           历史参考内参
+├── assets/                       当前入口所需模型
+├── calibration/                  内参与两套 handeye 离线工具
+├── tests/hero/                    当前入口的已有回归检查
+└── docs/
+    ├── hero.md
+    ├── 圆点标定操作流程.md
+    └── calibration_boards/        两种板的 SVG 与 PDF
+```
 
-`jlcv-pc` 是 Ubuntu 22.04.5。按这个版本装，不要按旧文档去装 Ubuntu 20.04 和 ROS Galactic。
+与参考仓库保持的是分层和模块职责。这里保留英雄需要的模块，没有复制步兵、哨兵或其他未使用的入口。`io/hero/` 对应参考仓库中独立硬件适配层的位置；算法继续使用当前已迁移的版本。
 
-#### 1. 编译依赖
+`configs/camera_info.yaml` 带有 `source: remote_hero_untuned`，只是历史相机数据。新内参结果另存实验目录，不会自动覆盖 `configs/hero.yaml`。
 
-吊射入口只需要这些：
+## 3. 环境准备
+
+参考系统为 Ubuntu 22.04。公共 C++ 依赖：
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
-    build-essential \
-    git \
-    cmake \
-    libopencv-dev \
-    libfmt-dev \
-    libspdlog-dev \
-    libyaml-cpp-dev \
-    nlohmann-json3-dev \
-    libeigen3-dev
+  build-essential cmake git \
+  libopencv-dev libeigen3-dev \
+  libfmt-dev libspdlog-dev libyaml-cpp-dev \
+  nlohmann-json3-dev
 ```
 
-`build-essential` 里包含 gcc、g++、make。
+安装需要本机权限与可用软件源。完整入口额外依赖 OpenVINO Runtime；海康实机采集还需要与系统架构匹配的 MVS SDK。离线标定不需要 OpenVINO、MVS、ROS 或串口。
 
-#### 2. yaml-cpp
+## 4. 构建方式
 
-用上面的 `libyaml-cpp-dev`（Ubuntu 22.04 上是 0.7）。不要再从 GitHub 下 yaml-cpp 源码改它的 CMakeLists。
+### 4.1 默认构建当前入口与标定工具
 
-参数写在 `configs/*.yaml`。改完保存即可，不用重新编译。
-
-#### 3. 相机 SDK
-
-吊射这条编译（`HEAVY_LOB_ONLY`）不链接相机。海康、迈德威视的头文件和库已经放在 `io/hikrobot`、`io/mindvision`，给同济全量工程用。
-
-以后要开海康相机时，再装 Linux 版 MVS，并按厂商说明做两件事：
-
-1. 跑 `set_usbfs_memory_size.sh`，加大 USB 缓存
-2. 跑 `set_usb_priority.sh`，让非管理员也能打开 USB3 相机
-
-注意区分 x86_64 和 arm64。装的时候对上机器架构。
-
-#### 4. 不安装 ROS 2
-
-吊射入口没有 ROS 节点，不用 FishROS，不用 Galactic，也不用 Humble。
-
-树里的 `io/ros2`、`tasks/auto_aim`、`tasks/auto_buff` 是同济原工程。  
-**上车主入口 `heavy_standard` 必须全量编译**（OpenVINO + 海康）。`HEAVY_LOB_ONLY` 只给吊射干跑/标定离线解算。
-
-哨兵的 Cartographer、octomap、rosbag 也不在本入口里装。
-
-#### 5. 安装 SSH
+默认启用 `BUILD_HERO=ON`、`BUILD_CALIBRATION=ON`，测试由标准的 `BUILD_TESTING` 控制。不再使用旧构建开关或嵌套工程。
 
 ```bash
-sudo apt-get install -y openssh-server
-sudo systemctl enable --now ssh
-sudo systemctl status ssh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DOpenVINO_DIR=/opt/openvino/2026.4.1/openvino/cmake
+cmake --build build -j4
+ctest --test-dir build --output-on-failure
 ```
 
-小电脑网口设在 `192.168.1.0/24`，开发机插上同一根网线就能连。当前小电脑地址是 `192.168.1.25`。远程桌面用 Remmina，协议 RDP，端口 3389。远程桌面的用户名和密码在小电脑的「设置 → 共享 → 远程桌面」里，和 SSH 登录密码不是同一项。
+`OpenVINO_DIR` 指向包含 `OpenVINOConfig.cmake` 的目录。另一台已安装 2024.6 的机器可能使用 `/opt/intel/openvino_2024.6.0/runtime/cmake`，请按实机安装位置填写，不要照搬版本路径。
 
-串口要用时把用户加进 `dialout`，重新登录后生效：
+主要产物为 `build/hero`、`build/calibrate_camera`、`build/calibrate_handeye` 与 `build/calibrate_robotworld_handeye`。相机、模型与算法分别通过 `io`、`auto_aim`、`auto_outpost`、`tools`、`hero_io` 目标组织，根入口负责链接。
+
+### 4.2 只构建离线标定工具
 
 ```bash
-sudo usermod -a -G dialout $USER
+cmake -S . -B build/calibration \
+  -DBUILD_HERO=OFF \
+  -DBUILD_CALIBRATION=ON
+cmake --build build/calibration -j4 --target calibrate_camera
+./build/calibration/calibrate_camera --help
 ```
 
-## 二、推荐软件安装
+该模式不查找 OpenVINO 或 MVS。两套已有 handeye 工具仍保留，按需构建对应目标即可。它们的输入假设和限制见详细教程。
 
-#### 1. VS Code
+使用新构建目录，避免沿用旧工程的 CMake 缓存。内存不足时将 `-j4` 改为 `-j2` 或 `-j1`。
 
-到官网下安装包。Snap 商店里的是阉割版。
+## 5. 两张标定板：选择、下载和打印
 
-#### 2. Remmina
+这里的“两张”按仓库已有的两种板规格整理。它们都是**白底黑圆点、对称圆点阵**，不是棋盘格或错列圆点阵；列数与行数数的是圆点。
 
-本机远程看 `jlcv-pc` 桌面用它。连接项「英雄小电脑」，地址 `192.168.1.25`，RDP，端口 3389。
-
-#### 3. Foxglove Studio（主调试）+ PlotJuggler（备用）
-
-笔记本装 [Foxglove](https://foxglove.dev/download)，连 `ws://192.168.1.25:8765`，导入 `docs/heavy_foxglove_layout.json`。这是替代旧 rosbridge 的看图/改参方式。
-
-PlotJuggler 仍可在小电脑上 UDP 监听 `127.0.0.1:9870`（`heavy_standard` 默认开；`heavy_lob --loop` 也推吊射曲线）。
-
-#### 4. cutecom
-
-```bash
-sudo apt-get install -y cutecom
-```
-
-看串口原始数据时用。吊射程序自己占用串口时，先关掉 cutecom。
-
-#### 5. terminator
-
-```bash
-sudo apt-get install -y terminator
-```
-
-如果 `Ctrl+Shift+E` 和输入法冲突，在 terminator 的快捷键里改掉分屏那一项。
-
-#### 6. 输入法
-
-```bash
-sudo apt-get install -y ibus-libpinyin
-```
-
-#### 7. VLC
-
-最小安装的系统没有播放器。录完调试视频用 VLC 看。
-
-```bash
-sudo apt-get install -y vlc
-```
-
-#### 8. qv4l2
-
-调普通 USB 相机参数。工业相机不用这个。
-
-```bash
-sudo apt-get install -y libv4l-dev qv4l2
-```
-
-#### 9. 其他
-
-```bash
-sudo apt-get install -y unzip unrar git net-tools
-```
-
-## 三、代码使用
-
-吊射 only：
-
-```bash
-cmake -B build_lob -DHEAVY_LOB_ONLY=ON
-cmake --build build_lob -j$(nproc)
-```
-
-上车主入口（小电脑已装 OpenVINO / 海康）：
-
-```bash
-source /opt/intel/openvino_2024.6.0/setupvars.sh
-cmake -B build_full -DHEAVY_LOB_ONLY=OFF
-cmake --build build_full -j$(nproc) --target heavy_standard heavy_lob heavy_lob_offline_test
-./build_full/heavy_standard configs/heavy_standard.yaml
-```
-
-主要程序：
-
-1. `heavy_standard`：短焦自瞄（钉头）+ 打符 + 吊射（全量）
-2. `heavy_lob` / `heavy_lob_offline_test`：吊射
-3. `calibrate_*`：内参 + 两套手眼（`HEAVY_LOB_ONLY` 也可编离线解算）
-
-#### 1. 目录
-
-```
-src/heavy_standard.cpp                    上车主循环（HeroBoard）
-src/heavy_lob.cpp                         吊射入口
-io/hero_board.*                           英雄串口，形状照 CBoard
-tasks/lob_shot/                           状态机、0xA5/0x5A、永远低抛
-tasks/auto_aim/aimer.cpp                  钉头 + 已修 ekf[7] 转速
-calibration/                              小圆点板
-configs/heavy_standard.yaml               上车短焦（内参先占位）
-configs/heavy_lob.yaml / _robot.yaml      吊射干跑 / 实车门闩
-docs/操作手速查.md                         最短上车说明
-docs/同济上游意见草稿.md                   同济原码问题（#15）
-```
-
-根目录的 `autostart.sh` 是同济全量视觉的自启，里面写的是 `~/Desktop/sp_vision_25`。不要跑这个脚本。
-
-#### 2. 先跑测试
-
-```bash
-./build_lob/heavy_lob_offline_test
-./build_lob/heavy_lob configs/heavy_lob.yaml --once
-./build_lob/heavy_lob configs/heavy_lob.yaml --once --fire
-./build_lob/heavy_lob configs/heavy_lob.yaml --once --undock
-```
-
-正常时：
-
-1. 离线测试打印 `PASS`，俯仰角约 33.27°
-2. `--once` 打印 `status=READY`，`z=1`
-3. `--once --fire` 为 `z=2`
-4. `--once --undock` 为 `INHIBITED`，开火被清掉
-
-#### 3. 参数文件
-
-两个 yaml 改完保存就生效，不用重新编译。
-
-1. `configs/heavy_lob.yaml`：开环验收。`module_unlocked`、`module_docked` 为 true，没有实车信号也能把解算跑通。
-2. `configs/heavy_lob_robot.yaml`：实车默认。这两个门闩是 false。没有对接和放行信号时不会进入可发射状态。
-
-`base_yaw` 是底盘在 map 下的朝向，单位**弧度**（代码里直接做 `cos` / `sin`）。实车标定前用文件里的值。
-
-目标点、枪口偏移、弹速、风车圆柱都在这两个文件里。风车区域命中会抑制吊射。
-
-#### 4. 命令行
-
-| 参数 | 作用 |
-| --- | --- |
-| `--once` | 跑到终态后退出 |
-| `--fire` | `READY` 时把开火位置上 |
-| `--undock` | 模拟吊射模块未对接 |
-| `--loop` | 50 Hz 循环，直到退出 |
-| `--dry-run` | 默认 true，只打印报文 |
-| `--port` | 串口，默认 `/dev/ttyUSB0`（英雄 `device_name`） |
-| `--baud` | 波特率，默认 `921600` |
-| `--deploy` | 0xA5 deploy 位置 1（英雄部署模式） |
-
-实车循环（串口约定对齐英雄 `jlcv_serial_driver`：`/dev/ttyUSB0` @ 921600，下发 0xA5，回传 0x5A）：
-
-```bash
-./build_lob/heavy_lob configs/heavy_lob_robot.yaml --loop --dry-run=false --port=/dev/ttyUSB0
-```
-
-`--deploy=true` 或 yaml `deploy: true`。回传 `curr_pitch` / `curr_yaw` 进闭环；`bullet_speed` >1 时写进解算。串口打不开会退回 `DrySender`。
-
-`--once` 的退出码：到达预期终态为 0。没到 `READY`、开火后不是 `z=2`、或未对接时没有被抑制，返回非 0。
-
-#### 5. 报文
-
-1. `0xA5` 给吊射模块。`z=0` 空闲，`z=1` 瞄准，`z=2` 开火。
-2. 云台 SP 帧。yaw 是底盘相对角，日志里记 `yaw_frame=chassis_rel`。
-
-开火只在进入 `READY` 的边沿、并且加了 `--fire`（或调用方把 fire 置上）时发出。未对接、取消、重新上闩会把 fire 清掉。
-
-#### 6. 还没接上的硬件
-
-协议与工具已齐：0xA5/0x5A、英雄标定配置与离线程序。实车仍缺：门闩运行时信号、海康相机接线、`imu_world` / 站位实测。上面 dry-run 不是上车击发。
-
-## 四、调试
-
-上车主入口的调试手感对齐旧 ROS2（`jlauto-aim/hero`）：Foxglove 看图和曲线、yaml 热加载、假串口、录像回放。没有 ROS，没有 foxglove rosbridge。导读：[docs/代码导读.md](docs/代码导读.md)，操作：[docs/操作手速查.md](docs/操作手速查.md) §6。
-
-```bash
-# 首次：下 Foxglove C++ SDK（约 34MB，不进 git），再 cmake
-bash tools/get_foxglove_sdk.sh
-source /opt/intel/openvino_2024.6.0/setupvars.sh
-cmake -B build_full && cmake --build build_full -j$(nproc) --target heavy_standard
-# cmake 应打印 Foxglove SDK: ON
-
-./build_full/heavy_standard configs/heavy_standard.yaml
-# 笔记本 Foxglove 连 ws://192.168.1.25:8765 ，导入 docs/heavy_foxglove_layout.json
-```
-
-| 旧 ROS2 | 现在 |
-| --- | --- |
-| `image_raw` + `/detector/final_img` | Foxglove `/raw` `/vis`（JPEG，默认 15 Hz） |
-| `Latency: xx ms` 叠在 final_img | `/vis` 左上 + `/debug.latency_ms` |
-| `node_params.yaml` 改完免编译 | yaml 存盘 0.5s 热加载；Foxglove 参数面板当场改 |
-| `use_serial:=false` 假关节 | `--fake-board` |
-| `use_video` / `roborts_test` | `--video=records/xxx` 或 `assets/demo/demo` |
-| 生命周期切自瞄/能量 | `--mode=auto_aim\|small_buff\|big_buff\|lob\|idle` |
-| PlotJuggler / rqt | 仍保留 UDP `:9870`；imshow 默认关（`--imshow=true` 才开） |
-
-相机插 USB3。USB2 时海康全幅 Bayer 大约只有 24fps，日志会警告。`fps` 是处理帧率，`cam_fps` 是相机出帧率。
-
-吊射 only（`heavy_lob --loop`）仍向 UDP `9870` 发 `status`/`yaw_deg`/`pitch_deg`/`z`。`--once` 不推曲线。
-
-#### 1. 看日志
-
-程序用 spdlog 打到终端。上车看：`[OV]` 实际设备、`[HikRobot] USB2/USB3`、`[Debug] Foxglove`、`Switch to`、`[热加载]`。
-
-吊射看：`sender=`、`status=`、`pitch_deg=`、`z=`、`fire=`。`sender=DrySender` 表示没写串口。
-
-#### 3. 用 gdb
-
-```bash
-cmake -B build_lob -DHEAVY_LOB_ONLY=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build_lob -j$(nproc)
-gdb --args ./build_lob/heavy_lob configs/heavy_lob.yaml --once
-```
-
-#### 4. 录屏时长
-
-```bash
-gsettings set org.gnome.settings-daemon.plugins.media-keys max-screencast-length 300
-```
-
-单位是秒。默认太短，调试录像会被截断。
-
-## 五、吊射审核结论与调参
-
-对照本机旧仓 `~/heavy`（ROS）与现役 `~/jl_sp_vision`（无 ROS、永远低抛）后的结论。调参前先读这一节。
-
-#### 1. 与旧 Heavy（ROS）的差异
-
-| 项 | 旧 Heavy（`~/heavy`） | 现役 |
+| 项目 | 小板 A | 大板 B |
 | --- | --- | --- |
-| 弹道 | 先解高抛，高抛无解则失败；瞄准用低抛 | 只用低抛；高抛只记日志 `high_unused` |
-| 位姿 | TF：`map→base_link→muzzle` | yaml 先验 `base_*`、`base_yaw`、`muzzle_*` |
-| yaw 基点 | 底盘原点 | 枪口点（`muzzle_dx/dy` 为 0 时两者一致） |
-| 门闩 | 话题 `/lob_shot/module_*` | 只读 yaml 与 `--undock`，运行时无信号输入 |
-| 反馈 | `/joint_states` | 解析英雄 `0x5A`（pitch/yaw/bullet_speed）；无串口时 DrySender |
-| 出口 | 话题交给串口驱动打包 0xA5 | 本程序自打包 0xA5（含 deploy）；同济 SP 只打日志 |
-| 空闲发帧 | IDLE 不发 | IDLE 不发；`--loop` 下 **INHIBITED 会持续发 z=0** |
-| 标定 | ROS handeye 包 | 无 ROS：`calibration/` + `configs/calibration_hero.yaml` / `camera_info.yaml` |
+| 圆点排列 | 7 列 × 7 行，共 49 点 | 10 列 × 7 行，共 70 点 |
+| 相邻圆心距 | 25 mm | 40 mm |
+| 首末圆心跨度 | 150 × 150 mm | 360 × 240 mm |
+| 本次模板圆点直径 | 12.5 mm | 20 mm |
+| 模板纸张 | A4 竖向，210 × 297 mm | A2 横向，594 × 420 mm |
+| 对应配置 | `configs/calibration.yaml` | `configs/calibration_10x7.yaml` |
+| 可打印 PDF | [小板 A](docs/calibration_boards/circles_7x7_25mm_A4.pdf) | [大板 B](docs/calibration_boards/circles_10x7_40mm_A2.pdf) |
+| 矢量 SVG | [小板 A](docs/calibration_boards/circles_7x7_25mm_A4.svg) | [大板 B](docs/calibration_boards/circles_10x7_40mm_A2.svg) |
 
-已对齐：状态机 `WAITING → YAW → PITCH → READY`；门闩语义；风车；`pitch_max`；dry-run 33.27°；英雄串口与双套手眼工具。
+模板圆点直径是本次设计值；已有实体板以实测为准。`center_distance_mm` 表示圆心距，不是圆直径或两圆边缘之间的空隙。
 
-#### 2. 已知未接线与风险
+打印选择 **100% / 实际大小**，关闭“适合页面”和自动缩放。大板需要 A2 设备或打印店，不能缩到 A4 后继续填写 40 mm。
 
-1. 直接用 `heavy_lob_robot.yaml` 会一直 `INHIBITED`：门闩默认 false，又没有运行时信号能打开。
-2. 闭环要有真实 0x5A；无串口或反馈坏掉时仍会停在 `*_CONVERGING`（可先 `open_loop: true`）。
-3. `--loop --fire` 一进入 READY 就持续发 `z=2`，没有运行时开火开关。
-4. 实车 yaml 的 `friction_coeff` 默认 0.0，旧 Heavy `robot.yaml` 是 0.001（联调建议先改回 0.001）。
-5. 标定采图 `capture` 需全量编译（相机 SDK）；`HEAVY_LOB_ONLY` 只带离线解算三件套。
+打印后用尺检查底部 100 mm 标尺，以及多组横向、纵向圆心距。再平整贴到硬板上，避免波浪、翘曲和反光。浏览器预览尺寸不能代替实测。
 
-**改 yaml 即可**：几何、弹速、摩擦、门闩初值、开环、风车、符号、公差、串口/波特率/deploy、标定板与云台偏置。  
-**必须改代码 / 接线**：门闩运行时信号、INHIBITED 不发帧、运行时开火/取消、实车相机与站位标定数据落盘。
+![小板 A：7×7 对称圆点阵](docs/calibration_boards/circles_7x7_25mm_A4.svg)
 
-#### 3. 分场景调参
+![大板 B：10×7 对称圆点阵](docs/calibration_boards/circles_10x7_40mm_A2.svg)
 
-##### 本机 dry-run / 离线（`configs/heavy_lob.yaml`）
+两种板是替代选择。当前工具一次解算只接受一种规格，不能把两种板的照片放在同一输入目录中。
 
-几何不要乱改。先跑通这四条，退出码都应为 0：
+## 6. 内参标定：从拍照到结果
+
+### 6.1 固定相机设置
+
+确认镜头、焦距、对焦和分辨率，记录 ROI、裁剪、像素合并等设置。拍摄期间固定这些设置，关闭会改变焦距或对焦位置的自动功能。
+
+保存未缩放、未去畸变的原始分辨率图片，不要使用远程桌面截图。所有图片必须具有相同宽高。
+
+### 6.2 拍摄有差异的图片
+
+将完整板分别放在画面中心、边缘和四角，改变距离及板面倾斜方向。每次停稳、图像清晰后再保存。每张都应看见全部圆点，避免反光、运动模糊或遮挡。
+
+先采 20～30 张作为起点，关键是位置与角度覆盖，不是连续拍很多相似照片。不同批次、不同板、不同分辨率分别建目录。
+
+### 6.3 整理连续编号
+
+以小板 A 为例：
 
 ```bash
-./build_lob/heavy_lob_offline_test
-./build_lob/heavy_lob configs/heavy_lob.yaml --once
-./build_lob/heavy_lob configs/heavy_lob.yaml --once --fire
-./build_lob/heavy_lob configs/heavy_lob.yaml --once --undock
+mkdir -p datasets/intrinsic_7x7/images
+mkdir -p datasets/intrinsic_7x7/results
+cp configs/calibration.yaml datasets/intrinsic_7x7/board.yaml
 ```
 
-基线日志：`yaw_deg≈16.04`，`pitch_deg≈33.27`，`--once` 为 `z=1`，`--fire` 为 `z=2`，`--undock` 为 `INHIBITED`。
+将图片整理为：
 
-##### 上车前联调（仍 dry-run）
+```text
+datasets/intrinsic_7x7/
+├── board.yaml
+├── images/
+│   ├── 1.jpg
+│   ├── 2.jpg
+│   ├── 3.jpg
+│   └── ...
+└── results/
+```
 
-另存一份 robot 配置副本，临时设：
+工具从 `1.jpg` 起逐张读取，遇到第一张缺失或无法读取的图片就停止。不能跳号，不能只改扩展名把 PNG 当作 JPEG。**内参工具不读取姿态 TXT**，无需串口反馈。
 
-- `module_unlocked: true`、`module_docked: true`
-- `open_loop: true`
+### 6.4 运行解算
 
-再填实测 `base_*`、`muzzle_*`，用 `--once` 确认不是 `windmill block`、`pitch_deg` 不超过 `pitch_max_deg`。用 cutecom 核对 `a5=` 十六进制：以 `a5` 开头、共 13 字节。
+```bash
+./build/calibration/calibrate_camera datasets/intrinsic_7x7/images \
+  --config-path=datasets/intrinsic_7x7/board.yaml \
+  --camera-info=datasets/intrinsic_7x7/results/camera_info.yaml \
+  --output=datasets/intrinsic_7x7/results/intrinsics_flat.yaml \
+  --preview=none
+```
 
-##### 实车开环（有几何、无反馈）
+使用 `--参数=值`。这里显式指定输出路径，防止默认覆盖仓库中的 `configs/camera_info.yaml`。程序不会创建输出父目录，因此必须提前 `mkdir -p`。
 
-必须 `open_loop: true`。开环下 `yaw_tol` / `pitch_tol` / `aim_timeout_s` 不起作用。门闩在接入信号前只能在 yaml 里人工打开，**操作手确认模块已对接后再放行**。
+有桌面显示时，可将 `none` 改成 `auto` 快速预览，或 `manual` 逐张按键查看；SSH 没有图形显示时使用 `none`。
 
-1. 先不加 `--fire`，看云台方向，调 `yaw_sign`、`pitch_sign`、`base_yaw`
-2. 确认到位后再加 `--fire`（注意会持续开火）
+大板 B 的完整命令、图片整理脚本和参数说明见[详细教程](docs/圆点标定操作流程.md)。
 
-##### 实车闭环（有 yaw / pitch 反馈）
+### 6.5 阅读与检查输出
 
-`SerialSender` 已解析 0x5A。接上电控后 `open_loop: false`，再调：
+终端逐张打印 `[success]` 或 `[failure]`，失败样本跳过。现有程序只要有有效样本就可能继续求解，**退出码为 0 不等于样本充分或结果可靠**。
 
-| 参数 | 现象 | 步进 | 验收 |
-| --- | --- | --- | --- |
-| `yaw_tol` / `pitch_tol`（rad，默认 0.02） | 停在 `*_CONVERGING` | 0.005 | PlotJuggler 里 `status` 能到 READY |
-| `aim_timeout_s` | `IDLE (... timeout)` | 1 s | 不再超时 |
-| `pitch_sign` / `yaw_sign` | 越追越远 | 只有 ±1 | 误差单调减小 |
+输出包括：
 
-反馈符号必须与下发命令同一坐标约定。无反馈时先退回 `open_loop: true`。
+- `camera_info.yaml`：图像宽高、3×3 内参矩阵、五项畸变系数；采用 ROS 风格格式，但不需要 ROS。
+- `intrinsics_flat.yaml`：`camera_matrix` 与 `distort_coeffs` 两个扁平字段。
+- 注释中的重投影误差：所有有效圆点的二维欧氏误差算术平均，单位像素；不是 OpenCV 的 RMS 返回值。
 
-##### 风车抑制区
+```text
+K = [ fx   0  cx ]
+    [  0  fy  cy ]
+    [  0   0   1 ]
 
-| 参数 | 说明 | 步进 | 验收 |
-| --- | --- | --- | --- |
-| `windmill_x/y` | 按规则图纸 | — | `--once` 不是 `windmill block` |
-| `windmill_radius` | 误抑制或漏抑制 | 0.1 m | 半径很大时必须被抑制 |
-| `windmill_z_min/max` | 弹道从上方越过却被误判 | 0.1 m | 同上 |
+D = [k1, k2, p1, p2, k3]
+```
 
-实车先验 `(6.429, 11.690)` 到目标的连线，在 x=14.5 处离风车中心约 2.1 m，比半径 1.7 m 只多约 0.4 m。站位一变必须重跑 `--once`。
+`fx/fy` 是以像素为单位的焦距，`cx/cy` 是主点。当前工具用 `CALIB_FIX_K3` 固定 `k3`，不代表镜头没有更高阶畸变。
 
-##### 弹道与几何（dry-run 基线 33.27° 上实测）
+检查宽高与照片一致、数值有限、`fx/fy` 为正、独立重拍时结果可重复，并用未参与拟合的照片检查去畸变表现。平均误差小只是其中一项指标。
 
-| 参数 | 解决什么 | 灵敏度（约） | 步进 | 验收 |
-| --- | --- | --- | --- | --- |
-| `bullet_speed` | 整体远近（第一杠杆） | 16→37.3°，17→30.4° | 0.1 m/s | `pitch_deg` / 实弹 |
-| `friction_coeff` | 远距离偏近（下降段） | 0.001→33.39° | 0.0005 | 同上；旧车用 0.001 |
-| `pitch_max_deg` | `low exceeds pitch_max` | — | 按机械限位 | 看状态 |
-| `muzzle_dx/dy/dz` | 枪口系统偏差 | `dz`+0.1 → −0.39° | 0.01 m | `pitch_deg`/`yaw_deg` |
-| `base_x/y/z` | 站位 | `base_x`+0.5 → pitch −0.98° | 实测 | 同上 |
-| `base_yaw`（**rad**） | yaw 常数偏置 | 1:1 进 yaw | 0.005 rad | `yaw_deg` |
-| `pitch_sign`/`yaw_sign` | 云台反向 | — | ±1 | 先不加 `--fire` |
+## 7. handeye 与内参有什么关系
 
-推荐顺序：符号 → `base_yaw` → 几何 → `bullet_speed` → `friction`。弹速已可从 0x5A 实时写入（回传 >1 时）。
+**内参**描述相机如何把三维点投到图像；**手眼标定**描述相机与另一个刚体坐标系之间的固定变换。
 
-## 六、相机标定（上车感知前必做）
+| 项目 | 相机内参 | 通用手眼标定 |
+| --- | --- | --- |
+| 典型输入 | 板图片、圆心几何 | 图片、已知内参、与图片同步的刚体位姿 |
+| 典型输出 | `K`、`D`、图像尺寸 | 坐标系间的旋转 `R` 与平移 `t` |
+| 是否需要姿态文件 | 本仓库内参工具不需要 | 现有手眼实现需要配对姿态 |
+| 标定板数量 | 一种板、多种视角 | 不因叫 handeye 就必须换第二块板 |
 
-**主路径：英雄对称小圆点板 7×7 @ 25mm。** 无 ROS。逐步操作见：
+两张板不分别绑定“内参”和“手眼”。通用手眼还需明确 eye-in-hand / eye-to-hand、变换方向、单位和时间同步，不能把任意 `R/t` 当作可互换结果。
 
-**[docs/圆点标定操作流程.md](docs/圆点标定操作流程.md)**
+解释、矩阵记号和现有实现限制见[详细教程](docs/圆点标定操作流程.md)第 9 节。该节不提供此平台的实机操作或瞄准配置接入步骤。
 
-吊射 `HEAVY_LOB_ONLY` 运行时不读相机，但已编三套离线解算；采图 `capture` 需全量编译（相机 SDK）。结果给 `solver` / `buff_solver`。
+## 8. 常见问题
 
-| 配置 | 用途 |
+| 现象 | 先检查什么 |
 | --- | --- |
-| `configs/calibration.yaml` | **主配置**（7×7@25 + 轴偏置 + blob） |
-| `configs/camera_info.yaml` | 内参（ROS 格式） |
-| `configs/calibration_hero.yaml` | 与主配置同内容的别名 |
-| `configs/calibration_legacy_10x7.yaml` | 旧同济大板旁路 |
+| 无有效内参样本 | 路径、`1.jpg`、图片是否可读、板规格是否一致 |
+| 有很多图片却只读几张 | 编号断档或中间图片损坏 |
+| 所有图片检测失败 | 对称圆点阵类型、点数、黑白方向、反光和清晰度 |
+| 远处圆点检测失败 | 圆点像素大小是否落在 blob 面积范围内 |
+| 无法连接图形显示 | 改用 `--preview=none` |
+| 参数被当作 `true` | 使用 `--config-path=...` 等等号写法 |
+| 输出不存在或未更新 | 输出父目录与写权限；写文件辅助函数未检查流错误 |
+| 新内参与旧值不同 | 镜头、焦距、分辨率是否不同；旧值是否只是参考 |
+| 小误差但参数不稳定 | 图片是否相似、覆盖不足、板是否弯曲 |
 
-```bash
-# 离线
-cmake -B build_lob -DHEAVY_LOB_ONLY=ON && cmake --build build_lob -j$(nproc) \
-  --target calibrate_camera calibrate_handeye calibrate_robotworld_handeye
-# 采图（全量）
-cmake -B build && cmake --build build -j$(nproc) --target capture
+## 9. 清理与历史记录
 
-./build/capture --config-path=configs/calibration.yaml \
-  --output-folder=assets/img_with_q --attitude=serial
-./build_lob/calibrate_camera assets/img_with_q \
-  --config-path=configs/calibration.yaml --camera-info=configs/camera_info.yaml --preview=auto
-./build_lob/calibrate_robotworld_handeye assets/img_with_q \
-  --config-path=configs/calibration.yaml --camera-info=configs/camera_info.yaml \
-  --output=configs/calibration_result.yaml --preview=auto
-```
+此次整理移除了旧 Heavy 入口与专属资源，将当前英雄程序移入根目录模块，保留 Git 历史与仓库外的清理前快照。清理没有修改相机设置、串口协议或算法计算逻辑。
 
-手眼主路径为 `calibrate_robotworld_handeye`；`calibrate_handeye` 为辅。CLI 用 `--key=value`。性能：blob 复用、采图预览半分辨率检测、默认 `--preview=auto`。
+2026-11-05 之前的记录中，1000 帧相机测试采集约 165 FPS，完整视觉处理约 100～106 FPS；仍有跟踪重建等未解决问题。目录整理和离线回归不能替代实机验收。

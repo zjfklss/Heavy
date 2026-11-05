@@ -1,72 +1,15 @@
-cmake_minimum_required(VERSION 3.16)
+add_library(io STATIC camera.cpp)
+target_link_libraries(io PUBLIC tools)
 
-find_package(yaml-cpp REQUIRED)
-
-add_subdirectory(serial)
-
-# 创建目标 io
-add_library(io STATIC 
-    hikrobot/hikrobot.cpp    
-    mindvision/mindvision.cpp  
-    usbcamera/usbcamera.cpp  
-    camera.cpp
-    cboard.cpp
-    hero_board.cpp
-    dm_imu/dm_imu.cpp
-    gimbal/gimbal.cpp
-)
-
-# hikrobot。装了 /opt/MVS 就用它：仓库自带的 libMvCameraControl 较旧，USB3 枚举会返回 MV_E_RESOURCE。
-target_include_directories(io PUBLIC hikrobot/include)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" AND EXISTS "/opt/MVS/lib/64/libMvCameraControl.so")
-  set(MV_CAMERA_LIB "/opt/MVS/lib/64/libMvCameraControl.so")
-  message(STATUS "Hikrobot SDK: /opt/MVS")
+find_path(HERO_MVS_INCLUDE MvCameraControl.h HINTS /opt/MVS/include)
+find_library(HERO_MVS_LIBRARY MvCameraControl HINTS /opt/MVS/lib/64 /opt/MVS/lib/aarch64)
+if(HERO_MVS_INCLUDE AND HERO_MVS_LIBRARY)
+  target_sources(io PRIVATE hikrobot/hikrobot.cpp)
+  target_compile_definitions(io PRIVATE HERO_WITH_MVS)
+  target_include_directories(io PRIVATE ${HERO_MVS_INCLUDE})
+  target_link_libraries(io PUBLIC ${HERO_MVS_LIBRARY} usb-1.0)
 else()
-  set(MV_CAMERA_LIB MvCameraControl)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
-    target_link_directories(io PUBLIC hikrobot/lib/amd64)
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    target_link_directories(io PUBLIC hikrobot/lib/arm64)
-  else()
-    message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
-  endif()
-  message(STATUS "Hikrobot SDK: bundled")
+  message(STATUS "MVS not found: live camera unavailable; offline modes remain available")
 endif()
 
-# mindvision
-target_include_directories(io PUBLIC mindvision/include)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
-  target_link_directories(io PUBLIC mindvision/lib/amd64)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  target_link_directories(io PUBLIC mindvision/lib/arm64)
-else()
-  message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
-endif()
-
-target_link_libraries(io ${MV_CAMERA_LIB} MVSDK usb-1.0 yaml-cpp serial lob_shot)
-
-################## 可选 ROS2（heavy_standard 不用；本机 Humble 残缺时 QUIET 仍会 FATAL）##################
-option(IO_WITH_ROS2 "Compile io/ros2 (publish2nav)" OFF)
-if(NOT IO_WITH_ROS2)
-    message(STATUS "ROS2 io skipped (IO_WITH_ROS2=OFF)")
-else()
-find_package(ament_cmake QUIET)
-find_package(rclcpp QUIET)
-find_package(std_msgs QUIET)
-find_package(rosidl_typesupport_cpp QUIET)
-find_package(sp_msgs QUIET)
-
-# 如果找不到 ROS 环境，则跳过 ROS 相关的部分
-if(NOT ament_cmake_FOUND OR NOT rclcpp_FOUND OR NOT std_msgs_FOUND OR NOT rosidl_typesupport_cpp_FOUND OR NOT sp_msgs_FOUND)
-    message(WARNING "ROS2 not found, skipping ROS2 specific code.")
-else()
-    message(STATUS "ROS2 environment found, compiling ROS2-related code.")
-    
-    # 添加 ROS2 相关的文件
-    target_sources(io PRIVATE ros2/publish2nav.cpp ros2/ros2.cpp ros2/subscribe2nav.cpp)
-
-    # 设置 ROS2 依赖
-    include_directories(${std_msgs_INCLUDE_DIRS})
-    ament_target_dependencies(io rclcpp std_msgs sp_msgs)
-endif()
-endif()
+add_subdirectory(hero)

@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <string>
+#include <mutex>
 
 namespace tools
 {
@@ -28,7 +29,8 @@ void set_logger()
 
 std::shared_ptr<spdlog::logger> logger()
 {
-  if (!logger_) set_logger();
+  static std::once_flag initialized;
+  std::call_once(initialized, set_logger);
   return logger_;
 }
 

@@ -4,15 +4,14 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <iostream>
 
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
-#include "tools/ov_device.hpp"
 
 namespace auto_aim
 {
-YOLOV5::YOLOV5(const std::string & config_path, bool debug)
-: debug_(debug), detector_(config_path, false)
+YOLOV5::YOLOV5(const std::string & config_path, bool debug) : debug_(debug), detector_(config_path, false)
 {
   auto yaml = YAML::LoadFile(config_path);
 
@@ -26,7 +25,7 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
   width = yaml["roi"]["width"].as<int>();
   height = yaml["roi"]["height"].as<int>();
   use_roi_ = yaml["use_roi"].as<bool>();
-  use_traditional_ = yaml["use_traditional"].as<bool>();
+  std::cout << "use roi: " << use_roi_ << std::endl;
   roi_ = cv::Rect(x, y, width, height);
   offset_ = cv::Point2f(x, y);
 
@@ -44,16 +43,11 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
 
   input.model().set_layout("NCHW");
 
-  input.preprocess()
-    .convert_element_type(ov::element::f32)
-    .convert_color(ov::preprocess::ColorFormat::RGB)
-    .scale(255.0);
+  input.preprocess().convert_element_type(ov::element::f32).convert_color(ov::preprocess::ColorFormat::RGB).scale(255.0);
 
+  // TODO: ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY)
   model = ppp.build();
-  device_ = tools::resolve_ov_device(core_, device_);
-  compiled_model_ = core_.compile_model(
-    model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
-  tools::logger()->info("[YOLOV5] compiled on {} (LATENCY)", device_);
+  compiled_model_ = core_.compile_model(model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
 }
 
 std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
@@ -101,8 +95,7 @@ std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
   return parse(scale, output, raw_img, frame_count);
 }
 
-std::list<Armor> YOLOV5::parse(
-  double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
+std::list<Armor> YOLOV5::parse(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
 {
   // for each row: xywh + classess
   std::vector<int> color_ids, num_ids;
@@ -128,14 +121,10 @@ std::list<Armor> YOLOV5::parse(
     _class_id = class_id.x;
     _color_id = color_id.x;
 
-    armor_key_points.push_back(
-      cv::Point2f(output.at<float>(r, 0) / scale, output.at<float>(r, 1) / scale));
-    armor_key_points.push_back(
-      cv::Point2f(output.at<float>(r, 6) / scale, output.at<float>(r, 7) / scale));
-    armor_key_points.push_back(
-      cv::Point2f(output.at<float>(r, 4) / scale, output.at<float>(r, 5) / scale));
-    armor_key_points.push_back(
-      cv::Point2f(output.at<float>(r, 2) / scale, output.at<float>(r, 3) / scale));
+    armor_key_points.push_back(cv::Point2f(output.at<float>(r, 0) / scale, output.at<float>(r, 1) / scale));
+    armor_key_points.push_back(cv::Point2f(output.at<float>(r, 6) / scale, output.at<float>(r, 7) / scale));
+    armor_key_points.push_back(cv::Point2f(output.at<float>(r, 4) / scale, output.at<float>(r, 5) / scale));
+    armor_key_points.push_back(cv::Point2f(output.at<float>(r, 2) / scale, output.at<float>(r, 3) / scale));
 
     float min_x = armor_key_points[0].x;
     float max_x = armor_key_points[0].x;
@@ -163,9 +152,9 @@ std::list<Armor> YOLOV5::parse(
 
   std::list<Armor> armors;
   for (const auto & i : indices) {
+    sort_keypoints(armors_key_points[i]);
     if (use_roi_) {
-      armors.emplace_back(
-        color_ids[i], num_ids[i], confidences[i], boxes[i], armors_key_points[i], offset_);
+      armors.emplace_back(color_ids[i], num_ids[i], confidences[i], boxes[i], armors_key_points[i], offset_);
     } else {
       armors.emplace_back(color_ids[i], num_ids[i], confidences[i], boxes[i], armors_key_points[i]);
     }
@@ -182,8 +171,6 @@ std::list<Armor> YOLOV5::parse(
       it = armors.erase(it);
       continue;
     }
-    // 使用传统方法二次矫正角点
-    if (use_traditional_) detector_.detect(*it, bgr_img);
 
     it->center_norm = get_center_norm(bgr_img, it->center);
     ++it;
@@ -200,7 +187,7 @@ bool YOLOV5::check_name(const Armor & armor) const
   auto confidence_ok = armor.confidence > min_confidence_;
 
   // 保存不确定的图案，用于神经网络的迭代
-  // if (name_ok && !confidence_ok) save(armor);
+  if (name_ok && !confidence_ok) save(armor);
 
   return name_ok && confidence_ok;
 }
@@ -209,11 +196,10 @@ bool YOLOV5::check_type(const Armor & armor) const
 {
   auto name_ok = (armor.type == ArmorType::small)
                    ? (armor.name != ArmorName::one && armor.name != ArmorName::base)
-                   : (armor.name != ArmorName::two && armor.name != ArmorName::sentry &&
-                      armor.name != ArmorName::outpost);
+                   : (armor.name != ArmorName::two && armor.name != ArmorName::sentry && armor.name != ArmorName::outpost);
 
   // 保存异常的图案，用于神经网络的迭代
-  // if (!name_ok) save(armor);
+  if (!name_ok) save(armor);
 
   return name_ok;
 }
@@ -225,15 +211,13 @@ cv::Point2f YOLOV5::get_center_norm(const cv::Mat & bgr_img, const cv::Point2f &
   return {center.x / w, center.y / h};
 }
 
-void YOLOV5::draw_detections(
-  const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const
+void YOLOV5::draw_detections(const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const
 {
   auto detection = img.clone();
   tools::draw_text(detection, fmt::format("[{}]", frame_count), {10, 30}, {255, 255, 255});
   for (const auto & armor : armors) {
-    auto info = fmt::format(
-      "{:.2f} {} {} {}", armor.confidence, COLORS[armor.color], ARMOR_NAMES[armor.name],
-      ARMOR_TYPES[armor.type]);
+    auto info =
+      fmt::format("{:.2f} {} {} {}", armor.confidence, COLORS[armor.color], ARMOR_NAMES[armor.name], ARMOR_TYPES[armor.type]);
     tools::draw_points(detection, armor.points, {0, 255, 0});
     tools::draw_text(detection, info, armor.center, {0, 255, 0});
   }
@@ -246,10 +230,32 @@ void YOLOV5::draw_detections(
   cv::imshow("detection", detection);
 }
 
+void YOLOV5::sort_keypoints(std::vector<cv::Point2f> & keypoints)
+{
+  if (keypoints.size() != 4) {
+    std::cout << "beyond 4!!" << std::endl;
+    return;
+  }
+
+  std::sort(keypoints.begin(), keypoints.end(), [](const cv::Point2f & a, const cv::Point2f & b) { return a.y < b.y; });
+
+  std::vector<cv::Point2f> top_points = {keypoints[0], keypoints[1]};
+  std::vector<cv::Point2f> bottom_points = {keypoints[2], keypoints[3]};
+
+  std::sort(top_points.begin(), top_points.end(), [](const cv::Point2f & a, const cv::Point2f & b) { return a.x < b.x; });
+
+  std::sort(bottom_points.begin(), bottom_points.end(), [](const cv::Point2f & a, const cv::Point2f & b) { return a.x < b.x; });
+
+  keypoints[0] = top_points[0];     // top-left
+  keypoints[1] = top_points[1];     // top-right
+  keypoints[2] = bottom_points[1];  // bottom-right
+  keypoints[3] = bottom_points[0];  // bottom-left
+}
+
 void YOLOV5::save(const Armor & armor) const
 {
   auto file_name = fmt::format("{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
-  auto img_path = fmt::format("{}/{}_{}.jpg", save_path_, armor.name, file_name);
+  auto img_path = fmt::format("{}/{}_{}.jpg", save_path_, static_cast<int>(armor.name), file_name);
   cv::imwrite(img_path, tmp_img_);
 }
 
@@ -261,8 +267,7 @@ double YOLOV5::sigmoid(double x)
     return exp(x) / (1.0 + exp(x));
 }
 
-std::list<Armor> YOLOV5::postprocess(
-  double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
+std::list<Armor> YOLOV5::postprocess(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
 {
   return parse(scale, output, bgr_img, frame_count);
 }
