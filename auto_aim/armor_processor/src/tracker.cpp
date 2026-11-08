@@ -371,6 +371,11 @@ void Tracker::initIMM(const Armor & a)
     matched_id       = 0;
     outpost_rebuilt  = false;
     robot_rebuilt = false;
+    // 高度估计先按当前板初始化，避免在 updateOutpostHeights 首次执行前
+    // first_z/second_z/third_z 是未定义值，被火控当成"有效层"去排序
+    first_z  = za;
+    second_z = za;
+    third_z  = za;
     for (int i = 0; i < 3; i++) {
         outpost_id_seen_[i] = false;
         outpost_z_seen_[i]  = {0.0, 0.0};

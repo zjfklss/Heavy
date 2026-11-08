@@ -58,6 +58,9 @@ private:
     void targetCallback(const jlcv_interfaces::msg::Target::SharedPtr msg);
     void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
     void publishCommand(double pitch, double yaw, int shoot_flag);
+    /// 目标丢失 / 解算失败时调用：最近一次有效指令新鲜（0.5s 内）则保持云台，
+    /// 超时后停止发送；绝不发送绝对 (0,0)，shoot_flag 恒为 0
+    void publishHoldCommand();
 
     // ==================== 状态机处理 ====================
 
@@ -119,6 +122,17 @@ private:
     rclcpp::Time last_shoot_time_;
     int    shoot_flag_    = 0;
     bool   suggest_fire_  = false;
+
+    // 最近一次有效指令：目标丢失 / 解算失败时下发它保持云台，
+    // 避免直接发 (0,0) 绝对角把云台拽回水平造成"莫名低头"
+    bool         has_last_cmd_    = false;
+    double       last_pitch_cmd_  = 0.0;
+    double       last_yaw_cmd_    = 0.0;
+    rclcpp::Time last_cmd_stamp_;
+    double       cmd_hold_timeout_ = 0.5;  // 保持时长 (s)
+
+    // 四板锁板防抖：上一帧锁定的物理板号 (0..3)，-1 表示未锁定
+    int lock_plate_ = -1;
 
     // 掉头检测状态
     double last_vx_    = 0.0;

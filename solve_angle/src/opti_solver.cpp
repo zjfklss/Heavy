@@ -150,8 +150,10 @@ void SolveAngle::targetCallback(const jlcv_interfaces::msg::Target::SharedPtr ms
     // --- 目标丢失处理 ---
     if (!msg->tracking) {
         shoot_flag_ = 0;
-        RCLCPP_ERROR(this->get_logger(), "Target lost, stopping fire.");
-        publishCommand(0.0, 0.0, shoot_flag_);
+        lock_plate_ = -1;   // 目标丢失后重新选板，避免沿用旧板号
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+            "Target lost, holding gimbal (no absolute 0/0 command).");
+        publishHoldCommand();
         return;
     }
     // RCLCPP_INFO(this->get_logger(), "Target get, ready to fire.");
@@ -252,6 +254,12 @@ void SolveAngle::targetCallback(const jlcv_interfaces::msg::Target::SharedPtr ms
     if (solvable) {
         final_pitch += params_.debug_pitch_offset;
         final_yaw   += params_.debug_yaw_offset;
+        // 记录最近一次有效指令，供丢失/解算失败时保持云台
+        has_last_cmd_   = true;
+        last_pitch_cmd_ = final_pitch;
+        last_yaw_cmd_   = final_yaw;
+        last_cmd_stamp_ = this->now();
+
         shoot_flag_  = suggest_fire_ ? 2 : 1;
 
         // 角度偏差过大时仅校准，不开火
@@ -267,7 +275,9 @@ void SolveAngle::targetCallback(const jlcv_interfaces::msg::Target::SharedPtr ms
 
         publishCommand(final_pitch, final_yaw, shoot_flag_);
     } else {
-        publishCommand(0.0, 0.0, 0);
+        RCLCPP_DEBUG(this->get_logger(), "Unsolved target, holding gimbal.");
+        shoot_flag_ = 0;
+        publishHoldCommand();
     }
 }
 
@@ -387,7 +397,6 @@ bool SolveAngle::processOutpost(const jlcv_interfaces::msg::Target::SharedPtr ms
     double r     = (msg->radius_1 > 0.1) ? msg->radius_1 : 0.25;
     double cur_x = msg->position.x;
     double cur_y = msg->position.y;
-    double cur_z = msg->position.z;
     double vx    = msg->velocity.x;
     vx = 0.0;
     double vy    = msg->velocity.y;
@@ -419,31 +428,18 @@ bool SolveAngle::processOutpost(const jlcv_interfaces::msg::Target::SharedPtr ms
         return processOutpostFallback(msg, pitch_out, yaw_out);
     }
     // ------------------------------------------------------------------
-    // 3. 智能选择目标层：有效层优先，按高度降序排（最高层在 0）
+    // 3. 选择目标层：始终打最高有效层
+    //    旧逻辑在"最高层与次高层高度差 < 0.04m"时按当前 pitch 就近选层，
+    //    该分支一旦生效会形成正反馈（云台压低后更倾向选低层），把目标层
+    //    锁在下面的板上，表现为"有时锁到下面的板"。三层高度差实际约 0.1m，
+    //    收敛后最高层稳定，直接固定打最高有效层即可。
     // ------------------------------------------------------------------
     std::sort(std::begin(layers), std::end(layers),
               [](const ArmorLayer& a, const ArmorLayer& b) {
                   if (a.valid != b.valid) return a.valid > b.valid;
                   return a.z > b.z;
               });
-    // 前哨站相邻层标准高度差约 0.10m，仅在三层高度尚未收敛区分（差值 < 0.04m）时按当前 pitch 就近选择，收敛后固定打最高有效层
-    int target_layer_idx = 0;
-    if (valid_count >= 2 && (layers[0].z - layers[1].z) < 0.04) {
-        double min_pitch_diff = 1e6;
-        for (int i = 0; i < valid_count; ++i) {
-            if (!layers[i].valid) continue;
-            double dist_h = std::hypot(cur_x, cur_y);
-            double rough_pitch = std::atan2(layers[i].z, dist_h);
-            double pitch_diff = std::abs(rough_pitch - curr_pitch);
-            if (pitch_diff < min_pitch_diff) {
-                min_pitch_diff = pitch_diff;
-                target_layer_idx = i;
-            }
-        }
-        RCLCPP_DEBUG(this->get_logger(), 
-            "Outpost: selecting layer %d (z=%.2f) for minimal pitch adjustment",
-            layers[target_layer_idx].index, layers[target_layer_idx].z);
-    }
+    const int target_layer_idx = 0;
     ArmorLayer& target_layer = layers[target_layer_idx];
     // ------------------------------------------------------------------
     // 4. 使用 Brent 法求自洽预测时间
@@ -535,6 +531,14 @@ bool SolveAngle::processOutpostFallback(const jlcv_interfaces::msg::Target::Shar
     double cur_x = msg->position.x;
     double cur_y = msg->position.y;
     double cur_z = msg->position.z;
+    // 三层高度数据不全时，仍优先打已知的最高层板，避免退化为"当前锁到哪块打哪块"
+    {
+        double best_z = -1e9;
+        for (double z : {msg->first_z, msg->second_z, msg->third_z}) {
+            if (std::abs(z) > 0.01 && z > best_z) best_z = z;
+        }
+        if (best_z > -1e8) cur_z = best_z;
+    }
     double vx    = msg->velocity.x;
     vx = 0.0;
     double vy    = msg->velocity.y;
@@ -743,19 +747,33 @@ bool SolveAngle::processAssessment2(const jlcv_interfaces::msg::Target::SharedPt
     double pred_cy = cur_y + vy * predict_time;
     double pred_cz = cur_z;
 
-    // --- 选最佳装甲板 ---
+    // --- 选最佳装甲板（带锁板防抖）---
     double center_view_yaw = std::atan2(pred_cy, pred_cx);
     double yaw0 = angles::normalize_angle(msg->yaw + msg->match_id * 2.0 * M_PI / 4.0);
     double pred_yaw_base   = yaw0 + msg->v_yaw * predict_time;
     double armor_spacing   = 2.0 * M_PI / 4;
 
-    int    best_idx = 0;
-    double min_diff = 1e6;
+    int    best_idx   = 0;
+    double min_diff   = 1e6;
+    int    best_plate = -1;     // 物理板号 (0..3)，跨帧不变，用于锁板
+    int    lock_idx   = -999;   // 上一帧锁定板在本帧的候选序号
+    double lock_diff  = 1e6;
     for (int i = -1; i < 3; ++i) {
         double this_yaw = pred_yaw_base + i * armor_spacing;
         double diff     = std::abs(angles::shortest_angular_distance(this_yaw, center_view_yaw));
-        if (diff < min_diff) { min_diff = diff; best_idx = i; }
+        int    plate    = ((msg->match_id + i) % 4 + 4) % 4;
+        if (diff < min_diff) { min_diff = diff; best_idx = i; best_plate = plate; }
+        if (lock_plate_ == plate) { lock_idx = i; lock_diff = diff; }
     }
+
+    // 上一帧锁定的板仍接近最佳板（容差 5°）时保持锁定，
+    // 避免目标旋转到两块板呈对称角度时在“正对板/侧板”之间来回切换
+    if (lock_idx != -999 && lock_diff < min_diff + 5.0 * M_PI / 180.0) {
+        best_idx   = lock_idx;
+        min_diff   = lock_diff;
+        best_plate = lock_plate_;
+    }
+    lock_plate_ = best_plate;
 
     double best_armor_yaw = pred_yaw_base + best_idx * armor_spacing;
 
@@ -807,7 +825,9 @@ bool SolveAngle::processAssessment2(const jlcv_interfaces::msg::Target::SharedPt
 
     // --- 开火判定 ---
     double threshold       = 4.0 * M_PI / 180.0;
-    bool   is_low_spinning = (msg->v_yaw < 1) && (min_diff < 10 * threshold);
+    // 注意：必须用 |v_yaw| 判断，原来写的是 msg->v_yaw < 1，
+    // 会让逆时针旋转（v_yaw<0）永远命中"低速放宽"分支，开火窗口比顺时针大一个数量级
+    bool   is_low_spinning = (std::abs(msg->v_yaw) < 1) && (min_diff < 10 * threshold);
     suggest_fire_ = (min_diff < threshold || is_low_spinning);//&& ;
     geometry_msgs::msg::Vector3 cmd;
     cmd.x = final_target.z;
@@ -858,6 +878,22 @@ void SolveAngle::publishCommand(double pitch, double yaw, int shoot_flag) {
     cmd.y = yaw;
     cmd.z = static_cast<double>(shoot_flag);
     gimbal_cmd_pub_->publish(cmd);
+}
+
+// ======================================================================
+// 辅助：publishHoldCommand
+// 目标丢失 / 弹道解算失败时调用。绝不发送绝对 (0,0)：
+// 之前版本发 (0,0,0) 会让云台直接跳到水平角，表现为"莫名低头"
+// ======================================================================
+
+void SolveAngle::publishHoldCommand() {
+    bool use_last = has_last_cmd_ &&
+        (this->now() - last_cmd_stamp_).seconds() < cmd_hold_timeout_;
+    if (use_last) {
+        // 最近一次有效指令仍新鲜：原样保持（仅关火），避免短暂丢帧导致云台跳变
+        publishCommand(last_pitch_cmd_, last_yaw_cmd_, 0);
+    }
+    // 超时后不再发送指令：交给电控自行保持/超时，既不低头，也不和手动控云台打架
 }
 
 // ======================================================================
