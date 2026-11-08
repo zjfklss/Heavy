@@ -1,0 +1,8 @@
+/jlcv_serial_driver:
+  ros__parameters:
+    timestamp_offset: 0.000
+    device_name: /dev/ttyUSB0
+    baud_rate: 921600   #921600 or 115200
+    flow_control: none
+    parity: none
+    stop_bits: "1"

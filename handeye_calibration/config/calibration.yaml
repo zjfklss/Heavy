@@ -1,0 +1,23 @@
+# config/calibration.yaml
+# 手眼标定配置文件（不包含相机内参，内参单独存放）
+
+# 标定板参数
+pattern_cols: 7          # 圆点网格列数
+pattern_rows: 7           # 圆点网格行数
+center_distance_mm: 25.0  # 相邻圆心距离（毫米）
+
+# 云台到IMU本体的旋转矩阵（3x3，行主序）
+# 由于IMU提供yaw和pitch，roll固定为0，这里设为单位矩阵
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+# ===== 云台运动学偏移（RoboMaster云台 yaw/pitch 轴不共点）=====
+# 基坐标系(yaw基座/imu绝对坐标系)约定：X 前, Y 左, Z 上；yaw 绕 Z, pitch 绕 Y。
+# 单位：毫米(mm)，与 center_distance_mm 保持一致。
+#
+# yaw轴中心 -> pitch轴中心 的偏移，在"yaw旋转之后、pitch旋转之前"的坐标系下表示。
+# 例：pitch轴在yaw轴前上方 => x 为正(前), z 为正(上)。
+p_yaw_to_pitch_mm: [62.11, 0.0, 151.32]
+#
+# pitch轴中心 -> 枪管/相机安装参考点(云台坐标系原点) 的偏移，
+# 在随yaw和pitch一起转动的云台坐标系下表示。
+p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]

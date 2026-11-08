@@ -1,0 +1,30 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/ricardo/one/install/jlcv_serial_driver/include/**",
+        "/home/ricardo/one/install/serial_driver/include/**",
+        "/home/ricardo/one/install/rm_lifecycle_manager/include/**",
+        "/home/ricardo/one/install/galaxy_camera/include/**",
+        "/home/ricardo/one/install/energy_processor/include/**",
+        "/home/ricardo/one/install/energy_detector/include/**",
+        "/home/ricardo/one/install/energy_interfaces/include/**",
+        "/home/ricardo/one/install/armor_processor/include/**",
+        "/home/ricardo/one/install/armor_detector/include/**",
+        "/home/ricardo/one/install/jlcv_interfaces/include/**",
+        "/opt/ros/galactic/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

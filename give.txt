@@ -1,0 +1,50 @@
+this->declare_parameter("bullet_speed", 16.6);
+    this->declare_parameter("k_air_resistance", 0.0068); // 根据 Hero 弹道调整
+    this->declare_parameter("gravity", 9.7915);
+    
+    this->declare_parameter("pitch_offset", -0.08);
+    this->declare_parameter("yaw_offset", 0.05);
+    this->declare_parameter("shoot_delay", 0.115); 
+    
+    
+    this->declare_parameter("max_yaw_error", 0.05); // 约 3度
+    
+    this->declare_parameter("target_frame", "world");
+    // 默认允许 6cm 的横向误差 (大装甲板宽23cm，这意味着只要偏离中心不超过6cm就开火，比较稳)
+    this->declare_parameter("max_linear_error", 0.06); 
+    this->declare_parameter("max_allow_angle", 0.25);
+    this->declare_parameter("min_allow_angle", 0.015); // 约0.8度，远距离如果不准就不发弹
+
+
+
+    // 加载 BallisticConfig
+    solver_config_.bullet_speed = this->get_parameter("bullet_speed").as_double();
+    solver_config_.k_air = this->get_parameter("k_air_resistance").as_double();
+    solver_config_.gravity = this->get_parameter("gravity").as_double();
+    solver_config_.latency = 0.0;
+
+    solver_ = std::make_unique<BallisticSolver>(solver_config_);
+
+    // 加载业务参数
+    params_.debug_pitch_offset = this->get_parameter("pitch_offset").as_double();
+    params_.debug_yaw_offset = this->get_parameter("yaw_offset").as_double();
+    params_.max_yaw_error = this->get_parameter("max_yaw_error").as_double();
+    params_.shoot_delay = this->get_parameter("shoot_delay").as_double();
+    params_.max_linear_error = this->get_parameter("max_linear_error").as_double();
+    params_.max_allow_angle = this->get_parameter("max_allow_angle").as_double();
+    params_.min_allow_angle = this->get_parameter("min_allow_angle").as_double();
+    
+
+    // 2. 初始化 ROS 接口
+    target_sub_ = this->create_subscription<jlcv_interfaces::msg::Target>(
+        "/processor/target", rclcpp::SensorDataQoS(),
+        std::bind(&SolveAngle::targetCallback, this, std::placeholders::_1));
+
+    gimbal_cmd_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>(
+        "/gimbal_command", rclcpp::SensorDataQoS());
+        
+    RCLCPP_INFO(this->get_logger(), "Hero Fire Control Initialized. V_Bullet: %.2f, K_Air: %.3f", 
+        solver_config_.bullet_speed, solver_config_.k_air);
+    RCLCPP_INFO(this->get_logger(), 
+    "Hero Fire Control Params Initialized. Pitch_Offset: %.2f, Yaw_Offset: %.3f, Shoot_Delay: %.3f", 
+        params_.debug_pitch_offset, params_.debug_yaw_offset, params_.shoot_delay);

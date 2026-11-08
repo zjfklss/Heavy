@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="rm_gimbal"
+  xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- short-up -->
+  <xacro:arg name="xyz" default="-0.044  0.0  -0.0693" />
+  <xacro:arg name="rpy" default="0.0  0.1745329251  0.0" />
+
+  <!-- long-down -->
+  <xacro:arg name="xyz1" default="-0.065  -0.0515  0.0825" />
+  <xacro:arg name="rpy1" default="0 0 0" />
+
+
+  <link name="world" />
+  <link name="yaw_link" />
+
+  <joint name="yaw_joint" type="continuous">
+    <parent link="world" />
+    <child link="yaw_link" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <link name="pitch_link" />
+
+  <joint name="pitch_joint" type="continuous">
+    <parent link="yaw_link" />
+    <child link="pitch_link" />
+    <axis xyz="0 -1 0" />
+  </joint>
+
+  <link name="camera_link" />
+
+  <!-- short-up -->
+  <xacro:property name="gimbal_camera_transfrom">
+    <origin xyz="$(arg xyz)" rpy="$(arg rpy)" />
+  </xacro:property>
+
+  <joint name="camera_joint" type="fixed">
+    <xacro:insert_block name="gimbal_camera_transfrom" />
+    <parent link="pitch_link" />
+    <child link="camera_link" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="camera_optical_frame" />
+
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}" />
+    <parent link="camera_link" />
+    <child link="camera_optical_frame" />
+  </joint>
+   <!-- short-up -->
+
+  <!-- long-down -->
+  <xacro:property name="gimbal_camera_transfrom1">
+    <origin xyz="$(arg xyz1)" rpy="$(arg rpy1)" />
+  </xacro:property>
+
+  <link name="camera_link1" />
+
+  <joint name="camera_joint1" type="fixed">
+    <xacro:insert_block name="gimbal_camera_transfrom1" />
+    <parent link="pitch_link" />
+    <child link="camera_link1" />
+    <axis xyz="0 0 0" />
+  </joint>
+
+  <link name="camera_optical_frame1" />
+
+  <joint name="camera_optical_joint1" type="fixed">
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}" />
+    <parent link="camera_link1" />
+    <child link="camera_optical_frame1" />
+  </joint>
+  <!-- long-dwon -->
+
+</robot>

@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "name": "linux-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/usr/include/eigen3",
+        "/usr/include/opencv4",
+        "/usr/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/jlcv/jlauto-aim/hero/install/jlcv_interfaces/include/jlcv_interfaces"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "${default}",
+      "cppStandard": "${default}",
+      "intelliSenseMode": "linux-gcc-x64",
+      "compilerArgs": [
+        ""
+      ]
+    }
+  ],
+  "version": 4
+}

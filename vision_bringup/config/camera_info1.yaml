@@ -1,0 +1,79 @@
+# image_width: 1440
+# image_height: 1080
+# camera_name: narrow_stereo
+# camera_matrix:
+#   rows: 3
+#   cols: 3
+#   data: [14058.200796, 0.0, 728.710158, 
+#           0.0, 14054.295089, 547.875641,
+#            0.0, 0.0, 1.0]
+# distortion_model: plumb_bob
+# distortion_coefficients:
+#   rows: 1
+#   cols: 5
+#   data: [-0.045607, 15.618331, 0.003756, 0.001610, 0.0]
+# rectification_matrix:
+#   rows: 3
+#   cols: 3
+#   data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+# projection_matrix:
+#   rows: 3
+#   cols: 4
+#   data: [14053.353516, 0.0, 728.410459, 0.0, 
+#         0.0, 14044.396484, 547.733567, 0.0, 
+#         0.0, 0.0, 1.0, 0.0]
+
+# # #6mm相机内参-手眼标定用
+# image_width: 1440
+# image_height: 1080
+# camera_name: narrow_stereo
+# camera_matrix:
+#   rows: 3
+#   cols: 3
+#   data: [1797.48738,    0.     ,  705.81289,
+#             0.     , 1796.27494,  542.92641,
+#             0.     ,    0.     ,    1.     ]
+# distortion_model: plumb_bob
+# distortion_coefficients:
+#   rows: 1
+#   cols: 5
+#   data: [-0.065006, 0.061319, -0.001105, -0.001780, 0.000000]
+# rectification_matrix:
+#   rows: 3
+#   cols: 3
+#   data: [1., 0., 0.,
+#          0., 1., 0.,
+#          0., 0., 1.]
+# projection_matrix:
+#   rows: 3
+#   cols: 4
+#   data: [1779.91968,    0.     ,  703.51907,    0.     ,
+#             0.     , 1784.82886,  541.90353,    0.     ,
+#             0.     ,    0.     ,    1.     ,    0.     ]
+
+image_width: 1440
+image_height: 1080
+camera_name: narrow_stereo
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [4717.78744,    0.     ,  717.88507,
+            0.     , 4713.65833,  576.17   ,
+            0.     ,    0.     ,    1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.003056, -0.015996, 0.000838, 0.000337, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [4714.76807,    0.     ,  717.5154 ,    0.     ,
+            0.     , 4709.36768,  575.84479,    0.     ,
+            0.     ,    0.     ,    1.     ,    0.     ]

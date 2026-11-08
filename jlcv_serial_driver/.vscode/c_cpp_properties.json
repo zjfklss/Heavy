@@ -1,0 +1,47 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/xms/nav/install/octomap_server/include/**",
+        "/home/xms/nav/install/nav2_xms_bringup/include/**",
+        "/home/xms/nav/install/fast_lio/include/**",
+        "/home/xms/nav/install/livox_ros_driver2/include/**",
+        "/home/xms/nav/install/linefit_ground_segmentation/include/**",
+        "/home/xms/nav/install/icp_localization_ros2/include/**",
+        "/home/xms/nav/install/2d_slam_xms/include/**",
+        "/home/xms/transform/install/pointcloud_to_laserscan/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/xms/rm_detector/src/solve_angle/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/galaxy_camera/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/solve_angle/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/auto_aim/armor_detector/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/auto_aim/armor_processor/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/rm_energy/energy_detector/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/rm_energy/energy_processor/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/rm_lifecycle_manager/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/jlcv_serial_driver/include/**",
+        "/home/xms/rm_detector/src/sentry-Detector/roborts_test/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/galaxy_camera/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/auto_aim/armor_detector/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/auto_aim/armor_processor/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/rm_energy/energy_detector/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/rm_energy/energy_processor/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/rm_lifecycle_manager/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/jlcv_serial_driver/include/**",
+        "/home/xms/rm_detector/src/sentry0729/src/sentry-Detector/roborts_test/include/**",
+        "include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
