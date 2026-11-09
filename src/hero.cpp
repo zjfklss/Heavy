@@ -15,6 +15,11 @@
 #include "io/hero/config.hpp"
 #include "io/camera.hpp"
 #include "io/hero/hero_serial.hpp"
+#include "src/hero_show.hpp"
+#include "src/simulation/launcher.hpp"
+#ifdef HERO_WITH_SIMULATION
+#include "src/simulation/runner.hpp"
+#endif
 #include "tasks/auto_aim/multithread/mt_detector.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
@@ -63,8 +68,11 @@ struct DecisionOutput
 class Decisions
 {
 public:
-  Decisions(std::string config, hero::Serial * serial, bool realtime, double timeout, bool no_fire)
-  : config_(std::move(config)), serial_(serial), realtime_(realtime), timeout_(timeout), no_fire_(no_fire)
+  Decisions(
+    std::string config, hero::Serial * serial, bool realtime, double timeout, bool no_fire,
+    tools::jlcv_show::Channel * display, hero::Clock::time_point origin)
+  : config_(std::move(config)), serial_(serial), realtime_(realtime), timeout_(timeout), no_fire_(no_fire),
+    display_(display), origin_(origin)
   {
     thread_ = std::thread([this] { run(); });
   }
@@ -140,6 +148,11 @@ private:
         auto gated_command = input->feedback_valid ? output.command : io::Command{false, false, 0, 0};
         bool tx_ok = false;
         if (serial_) tx_ok = serial_->send(gated_command, input->epoch);
+        // Dashboard shows what reached the wire live, and the decided command offline.
+        if (display_ && (!serial_ || tx_ok))
+          display_->command(
+            std::chrono::duration<double>(hero::Clock::now() - origin_).count(), gated_command.yaw,
+            gated_command.pitch, gated_command.control, gated_command.shoot);
         const auto packet = hero::encode(output.command);
         const auto stats = serial_ ? serial_->stats() : hero::TransportStats{};
         plotter.plot({{"command_yaw", output.command.yaw * 180 / CV_PI},
@@ -178,6 +191,8 @@ private:
   bool realtime_;
   double timeout_;
   bool no_fire_;
+  tools::jlcv_show::Channel * display_;
+  hero::Clock::time_point origin_;
   std::mutex mutex_;
   std::condition_variable ready_;
   std::optional<DecisionInput> latest_;
@@ -190,11 +205,11 @@ private:
 };
 }
 
-int main(int argc, char ** argv)
+int run_hero(int argc, char ** argv, tools::jlcv_show::Channel * display)
 {
   const std::string keys =
     "{help h usage ? | | Show usage}"
-    "{@config | configs/hero.yaml | Hero configuration}"
+    "{@config | | Hero YAML; default configs/hero.yaml, or configs/simulation/hero.yaml with --simulation}"
     "{check-config | false | Validate configuration without models or peripherals}"
     "{smoke-test | false | Process three blank frames without peripherals}"
     "{camera-test | false | Measure camera acquisition FPS without detection or serial}"
@@ -202,13 +217,43 @@ int main(int argc, char ** argv)
     "{yaw | 0 | Offline fixed hero yaw, radians}"
     "{pitch | 0 | Offline fixed hero pitch, positive up, radians}"
     "{frames | 0 | Frame limit, zero means unlimited}"
-    "{show | false | Show reprojection window}"
+    "{show | false | Live debug dashboard: camera, world estimates, yaw/pitch and shoot}"
     "{no-fire | false | Follow targets while suppressing fire commands}"
-    "{no-serial | false | Live camera with fixed yaw/pitch; never open serial}";
+    "{no-serial | false | Live camera with fixed yaw/pitch; never open serial}"
+    "{simulation | false | Receive images and gimbal feedback from rm_simulation over TCP; no camera or serial}"
+    "{sim-ui | true | Automatically open the simulator; false for external/headless sessions}"
+    "{sim-project | | Simulator project directory; default sibling ../rm_simulation}"
+    "{sim-preset | | Simulator sensor preset name or JSON path; default hero}"
+    "{sim-host | 127.0.0.1 | Simulation listen IPv4}"
+    "{sim-port | 17001 | Simulation listen TCP port}"
+    "{sim-once | false | Exit after one simulation session}";
   cv::CommandLineParser cli(argc, argv, keys);
   if (cli.has("help")) { cli.printMessage(); return 0; }
   try {
-    auto config = hero::validate_config(cli.get<std::string>(0));
+    const bool simulation = cli.get<bool>("simulation");
+    const auto config_path = hero::select_profile(cli.get<std::string>(0), simulation).string();
+    if (simulation) {
+      if (!cli.check()) { cli.printErrors(); return 2; }
+      if (cli.get<bool>("smoke-test") || cli.get<bool>("camera-test") || !cli.get<std::string>("video").empty() ||
+          cli.get<bool>("check-config") || cli.get<bool>("no-serial") || cli.get<int>("frames") != 0)
+        throw std::runtime_error("--simulation cannot be combined with video/smoke/camera-test/check-config/no-serial/frames");
+#ifdef HERO_WITH_SIMULATION
+      SimulationOptions options;
+      options.config = config_path;
+      options.host = cli.get<std::string>("sim-host");
+      options.port = cli.get<int>("sim-port");
+      options.project = cli.get<std::string>("sim-project");
+      options.preset = cli.get<std::string>("sim-preset");
+      options.show = cli.get<bool>("show");
+      options.once = cli.get<bool>("sim-once");
+      options.launch_ui = cli.get<bool>("sim-ui");
+      options.no_fire = cli.get<bool>("no-fire");
+      return run_hero_simulation(options, display);
+#else
+      throw std::runtime_error("Rebuild with -DHERO_WITH_SIMULATION=ON");
+#endif
+    }
+    auto config = hero::validate_config(config_path);
     const bool smoke = cli.get<bool>("smoke-test");
     const bool camera_test = cli.get<bool>("camera-test");
     const bool show = cli.get<bool>("show");
@@ -221,7 +266,7 @@ int main(int argc, char ** argv)
     if ((smoke && !video_path.empty()) || (camera_test && (smoke || !video_path.empty())))
       throw std::runtime_error("Choose only one input source");
     if (cli.get<bool>("check-config")) {
-      std::cout << "Valid hero configuration; RX=16 TX=13, no peripherals opened\n";
+      std::cout << "Valid hero configuration " << config_path << "; RX=16 TX=13, no peripherals opened\n";
       return 0;
     }
     ConfigFile resolved(config);
@@ -244,7 +289,10 @@ int main(int argc, char ** argv)
         }
         last = stamp;
         if (frames++ == 0) first = stamp;
-        if (show) { cv::imshow("reprojection", image); if (cv::waitKey(1) == 27) break; }
+        if (display) {
+          display->estimate({}, std::nullopt, "", image);
+          if (display->stopping()) break;
+        } else if (show) { cv::imshow("reprojection", image); if (cv::waitKey(1) == 27) break; }
       }
       const double elapsed = std::chrono::duration<double>(last - first).count();
       std::cout << "camera_frames=" << frames << " acquisition_fps="
@@ -265,18 +313,24 @@ int main(int argc, char ** argv)
       if (!cli.get<bool>("no-serial")) serial = std::make_unique<hero::Serial>(config["serial"]);
       else tools::logger()->info("[Input] Live camera, serial disabled, fixed yaw={} pitch={} rad", yaw, pitch);
     } else if (!smoke && !video.open(video_path)) throw std::runtime_error("Cannot open video: " + video_path);
-    Decisions decisions(resolved.path, serial.get(), !offline, config["decision_timeout"].as<double>(), cli.get<bool>("no-fire"));
+    const auto begin = hero::Clock::now();
+    if (display) {
+      display->reset(offline ? "离线固定姿态" : serial ? "英雄电控" : "实机相机 / 无串口");
+      display->status("运行中");
+    }
+    Decisions decisions(
+      resolved.path, serial.get(), !offline, config["decision_timeout"].as<double>(), cli.get<bool>("no-fire"),
+      show ? display : nullptr, begin);
     double fps = smoke ? 30 : video.get(cv::CAP_PROP_FPS);
     if (!std::isfinite(fps) || fps <= 0) fps = 30;
     std::atomic<bool> stop{false};
     std::atomic<bool> source_done{false};
     std::atomic<int> pending{0};
     std::exception_ptr producer_failure;
-    const auto begin = hero::Clock::now();
     std::thread producer([&] {
       try {
         int count = 0;
-        while (!stop && !interrupted && (!frame_limit || count < frame_limit)) {
+        while (!stop && !interrupted && !(display && display->stopping()) && (!frame_limit || count < frame_limit)) {
           if (pending >= 2) { std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue; }
           cv::Mat image;
           auto stamp = hero::Clock::now();
@@ -302,7 +356,7 @@ int main(int argc, char ** argv)
     int previous_frames = 0;
     uint64_t previous_captured = 0;
     try {
-      while (!interrupted) {
+      while (!interrupted && !(display && display->stopping())) {
         auto frame = detector.debug_pop_for(std::chrono::milliseconds(100));
         if (!frame) {
           if (source_done) break;
@@ -327,6 +381,12 @@ int main(int argc, char ** argv)
             feedback_valid = aligned && std::chrono::duration<double>(now - sample->stamp).count() <= config["serial"]["timeout"].as<double>();
           }
           if (aligned) orientation = *aligned;
+          if (display && show && sample)
+            display->feedback(
+              std::chrono::duration<double>(sample->stamp - begin).count(), sample->feedback.yaw,
+              sample->feedback.pitch);
+        } else if (display && show) {
+          display->feedback(std::chrono::duration<double>(stamp - begin).count(), yaw, pitch);
         }
         if (epoch != next_epoch || feedback_was_valid != feedback_valid) {
           tools::logger()->info("[Feedback] epoch={} valid={} previous_epoch={} previous_valid={}",
@@ -373,10 +433,14 @@ int main(int argc, char ** argv)
               tools::draw_points(image, solver.reproject_armor(output.aim.xyza.head<3>(), output.aim.xyza[3], target.armor_type, target.name), {0, 0, 255});
           }
           tools::draw_text(image, "yaw=" + std::to_string(ypr[0]) + " pitch=" + std::to_string(-ypr[1]), {10, 30}, {255, 255, 255});
-          cv::resize(image, image, {}, 0.5, 0.5);
-          cv::imshow("reprojection", image);
-          const auto key = cv::waitKey(1);
-          if (key == 27 || key == 'q') break;
+          if (display) {
+            publish_hero_estimate(display, targets, output.aim, image);
+          } else {
+            cv::resize(image, image, {}, 0.5, 0.5);
+            cv::imshow("reprojection", image);
+            const auto key = cv::waitKey(1);
+            if (key == 27 || key == 'q') break;
+          }
         }
       }
     } catch (...) { loop_failure = std::current_exception(); }
@@ -396,4 +460,17 @@ int main(int argc, char ** argv)
     std::cerr << "[heavy_hero] " << error.what() << '\n';
     return 1;
   }
+}
+
+int main(int argc, char ** argv)
+{
+  cv::CommandLineParser options(argc, argv, "{show|false|}{help h usage ?||}{check-config|false|}");
+  if (options.get<bool>("show") && !options.has("help") && !options.get<bool>("check-config")) {
+#ifdef HERO_WITH_SHOW_UI
+    return tools::jlcv_show::run_dashboard([&](auto & display) { return run_hero(argc, argv, &display); });
+#else
+    std::cerr << "[heavy_hero] --show uses the OpenCV window; build with -DHERO_WITH_SHOW_UI=ON for the dashboard\n";
+#endif
+  }
+  return run_hero(argc, argv, nullptr);
 }

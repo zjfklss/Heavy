@@ -5,3 +5,13 @@ add_test(NAME hero_unit COMMAND hero_test ${PROJECT_SOURCE_DIR}/configs/hero.yam
 add_test(NAME hero_config COMMAND hero ${PROJECT_SOURCE_DIR}/configs/hero.yaml --check-config)
 add_test(NAME hero_smoke COMMAND hero ${PROJECT_SOURCE_DIR}/configs/hero.yaml --smoke-test)
 set_tests_properties(hero_smoke PROPERTIES TIMEOUT 90)
+
+if(HERO_WITH_SIMULATION)
+  find_package(GTest REQUIRED)
+  add_executable(hero_simulation_test simulation_test.cpp)
+  target_link_libraries(hero_simulation_test PRIVATE hero_simulation GTest::gtest_main)
+  target_compile_definitions(hero_simulation_test PRIVATE HERO_TEST_ROOT="${PROJECT_SOURCE_DIR}")
+  add_test(NAME hero_simulation COMMAND hero_simulation_test)
+  set_tests_properties(hero_simulation PROPERTIES TIMEOUT 120)
+endif()
+add_test(NAME hero_simulation_config COMMAND hero ${PROJECT_SOURCE_DIR}/configs/simulation/hero.yaml --check-config)
