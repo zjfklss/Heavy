@@ -22,7 +22,7 @@ const std::string keys =
 void print_yaml(
   const std::vector<double> & R_gimbal2imubody_data, const cv::Mat & R_camera2gimbal,
   const cv::Mat & t_camera2gimbal, const Eigen::Vector3d & camera_ypr, double distance,
-  const Eigen::Vector3d & board_ypr, const std::string & output_path)
+  const Eigen::Vector3d & board_ypr, const Eigen::Vector3d & rpy, const std::string & output_path)
 {
   YAML::Emitter result;
   std::vector<double> R_data(R_camera2gimbal.begin<double>(), R_camera2gimbal.end<double>());
@@ -39,8 +39,8 @@ void print_yaml(
     camera_ypr[1], camera_ypr[2]));
   result << YAML::Newline;
   result << YAML::Comment(fmt::format(
-    "相机同理想情况的偏角: rpy: {:.6f} {:.6f} {:.6f} rad", camera_ypr[2] * M_PI / 180,
-    camera_ypr[1] * M_PI / 180, camera_ypr[0] * M_PI / 180));
+    "URDF 相机本体 rpy（同 hero.yaml camera_rpy、ROS launch_params rpy）: {:.6f} {:.6f} {:.6f} rad", rpy[0],
+    rpy[1], rpy[2]));
   result << YAML::Newline;
   result << YAML::Comment(fmt::format("标定板到世界坐标系原点的水平距离: {:.2f} m", distance));
   result << YAML::Newline;
@@ -49,6 +49,9 @@ void print_yaml(
     board_ypr[1], board_ypr[2]));
   result << YAML::Key << "R_camera2gimbal" << YAML::Value << YAML::Flow << R_data;
   result << YAML::Key << "t_camera2gimbal" << YAML::Value << YAML::Flow << t_data;
+  // configs/hero.yaml 的 camera_rpy：[roll, pitch, yaw]（rad），与 R_camera2gimbal 一起替换
+  result << YAML::Key << "camera_rpy" << YAML::Value << YAML::Flow
+         << std::vector<double>{rpy[0], rpy[1], rpy[2]};
   result << YAML::Newline << YAML::EndMap;
 
   std::string text = result.c_str();
@@ -77,7 +80,6 @@ int main(int argc, char * argv[])
     return 1;
   }
   double reproj_max = reproj_cli >= 0 ? reproj_cli : board.reproj_max_px;
-  calib::CircleGridDetector detector(board);
   auto obj_template = calib::centers_3d_vertical(board);
 
   cv::Mat camera_matrix, distort_coeffs;
@@ -89,20 +91,23 @@ int main(int argc, char * argv[])
 
   Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R_gimbal2imubody(board.R_gimbal2imubody.data());
   fmt::print(
-    "主路径 robotworld；板 {}x{} @ {:.1f}mm；偏置 yaw->pitch=[{:.2f},{:.2f},{:.2f}]mm\n",
-    board.pattern_cols, board.pattern_rows, board.center_distance_mm, board.p_yaw_to_pitch_mm[0],
+    "主路径 robotworld；板 {}；偏置 yaw->pitch=[{:.2f},{:.2f},{:.2f}]mm\n",
+    board.describe(), board.p_yaw_to_pitch_mm[0],
     board.p_yaw_to_pitch_mm[1], board.p_yaw_to_pitch_mm[2]);
 
   std::vector<cv::Mat> R_world2gimbal_list, t_world2gimbal_list, rvecs, tvecs;
+  std::vector<calib::HandEyeSample> samples;
   std::vector<cv::Point2f> prev_centers;
   bool have_prev = false;
 
-  for (int i = 1; true; i++) {
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto q_path = fmt::format("{}/{}.txt", input_folder, i);
-    auto img = cv::imread(img_path);
-    if (img.empty()) break;
-    Eigen::Quaterniond q = calib::read_q(q_path);
+  for (auto & detection : calib::detect_folder(input_folder, board)) {
+    const auto & img_path = detection.path;
+    auto q_path = fmt::format("{}/{}.txt", input_folder, detection.index);
+    Eigen::Quaterniond q;
+    if (!calib::read_q(q_path, q)) {
+      fmt::print("[rejected] {} 缺少或无法解析姿态 {}\n", img_path, q_path);
+      continue;
+    }
 
     Eigen::Matrix3d R_imubody2imuabs = q.toRotationMatrix();
     Eigen::Matrix3d R_gimbal2world =
@@ -114,13 +119,8 @@ int main(int argc, char * argv[])
       continue;
     }
 
-    auto drawing = img;
-    tools::draw_text(drawing, fmt::format("joint yaw   {:.2f}", joint[0]), {40, 40}, {0, 0, 255});
-    tools::draw_text(drawing, fmt::format("joint pitch {:.2f}", joint[1]), {40, 80}, {0, 0, 255});
-    tools::draw_text(drawing, fmt::format("roll        {:.2f}", joint[2]), {40, 120}, {0, 0, 255});
-
-    std::vector<cv::Point2f> centers;
-    bool ok = detector.detect(img, centers, true);
+    auto & centers = detection.points;
+    const bool ok = detection.ok;
     if (ok && calib::align_symmetric_180(have_prev ? &prev_centers : nullptr, centers)) {
       fmt::print("[flip180] {}\n", img_path);
     }
@@ -128,8 +128,13 @@ int main(int argc, char * argv[])
       prev_centers = centers;
       have_prev = true;
     }
-    calib::show_preview(
-      preview, drawing, board.pattern_size(), centers, ok, "calibrate_robotworld_handeye");
+    if (preview != calib::PreviewMode::None) {
+      auto drawing = cv::imread(img_path);
+      tools::draw_text(drawing, fmt::format("joint yaw   {:.2f}", joint[0]), {40, 40}, {0, 0, 255});
+      tools::draw_text(drawing, fmt::format("joint pitch {:.2f}", joint[1]), {40, 80}, {0, 0, 255});
+      tools::draw_text(drawing, fmt::format("roll        {:.2f}", joint[2]), {40, 120}, {0, 0, 255});
+      calib::show_preview(preview, drawing, board.pattern_size(), centers, ok, "calibrate_robotworld_handeye");
+    }
     fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);
     if (!ok) continue;
 
@@ -158,11 +163,17 @@ int main(int argc, char * argv[])
     t_world2gimbal_list.emplace_back(t_world2gimbal);
     rvecs.emplace_back(rvec);
     tvecs.emplace_back(tvec);
+    calib::HandEyeSample sample{img_path, R_gimbal2world, t_gimbal2world, {}, {}, centers};
+    cv::Mat R_b2c;
+    cv::Rodrigues(rvec, R_b2c);
+    cv::cv2eigen(R_b2c, sample.R_board2camera);
+    cv::cv2eigen(tvec, sample.t_board2camera_mm);
+    samples.push_back(std::move(sample));
   }
   fmt::print("有效样本 {}\n", rvecs.size());
 
-  if (rvecs.empty()) {
-    fmt::print(stderr, "无有效手眼样本\n");
+  if (rvecs.size() < 3) {
+    fmt::print(stderr, "有效手眼样本少于 3 组，无法求解\n");
     return 1;
   }
 
@@ -170,6 +181,21 @@ int main(int argc, char * argv[])
   cv::calibrateRobotWorldHandEye(
     rvecs, tvecs, R_world2gimbal_list, t_world2gimbal_list, R_world2board, t_world2board,
     R_gimbal2camera, t_gimbal2camera);
+  {
+    // 链路检查用 mm，在换算成米之前做
+    cv::Mat R_c2g, R_b2w;
+    cv::transpose(R_gimbal2camera, R_c2g);
+    cv::transpose(R_world2board, R_b2w);
+    cv::Mat t_c2g = -R_c2g * t_gimbal2camera, t_b2w = -R_b2w * t_world2board;
+    Eigen::Matrix3d R_c2g_e, R_b2w_e;
+    Eigen::Vector3d t_c2g_e, t_b2w_e;
+    cv::cv2eigen(R_c2g, R_c2g_e);
+    cv::cv2eigen(R_b2w, R_b2w_e);
+    cv::cv2eigen(t_c2g, t_c2g_e);
+    cv::cv2eigen(t_b2w, t_b2w_e);
+    calib::print_chain(
+      calib::check_chain(samples, obj_template, R_c2g_e, t_c2g_e, camera_matrix, distort_coeffs, &R_b2w_e, &t_b2w_e));
+  }
   t_gimbal2camera /= 1e3;
   t_world2board /= 1e3;
 
@@ -195,6 +221,6 @@ int main(int argc, char * argv[])
 
   print_yaml(
     board.R_gimbal2imubody, R_camera2gimbal, t_camera2gimbal, camera_ypr, distance, board_ypr,
-    output_path);
+    calib::camera_rpy_urdf(R_camera2gimbal_eigen), output_path);
   return 0;
 }

@@ -1,6 +1,7 @@
 # 主路径：英雄对称小圆点板 7×7 @ 25mm（白底黑点）
-# 大板见 calibration_10x7.yaml
+# 大板（棋盘格 内角点 11×8 @ 35mm）见 calibration_chessboard_11x8.yaml
 
+pattern_type: circles
 pattern_cols: 7
 pattern_rows: 7
 center_distance_mm: 25.0

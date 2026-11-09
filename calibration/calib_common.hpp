@@ -1,7 +1,9 @@
 #pragma once
-// 小圆点板主路径（英雄 7×7 @ 25mm 对称阵）：BoardConfig + 可复用检测器
+// 标定板配置与检测器：对称圆点阵（小板 7×7 @ 25mm）和棋盘格（大板内角点 11×8 @ 35mm）
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <fmt/core.h>
 #include <yaml-cpp/yaml.h>
 
@@ -30,10 +32,15 @@ inline std::string cli_str(cv::CommandLineParser & cli, const char * key)
   return v;
 }
 
+enum class PatternType { Circles, Chessboard };
+
 struct BoardConfig
 {
+  PatternType pattern_type = PatternType::Circles;
+  // 圆点板数圆点；棋盘格数内角点（不是方格数）
   int pattern_cols = 7;
   int pattern_rows = 7;
+  // 相邻特征点间距：圆点板为圆心距，棋盘格为方格边长（读 square_size_mm）
   float center_distance_mm = 25.f;
   std::vector<double> R_gimbal2imubody = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   Eigen::Vector3d p_yaw_to_pitch_mm = Eigen::Vector3d::Zero();
@@ -48,6 +55,13 @@ struct BoardConfig
   double reproj_max_px = 1.0;
 
   cv::Size pattern_size() const { return {pattern_cols, pattern_rows}; }
+  bool chessboard() const { return pattern_type == PatternType::Chessboard; }
+  std::string describe() const
+  {
+    return fmt::format(
+      "{} {}x{} @ {:.1f}mm", chessboard() ? "棋盘格(内角点)" : "对称圆点板", pattern_cols, pattern_rows,
+      center_distance_mm);
+  }
 };
 
 inline Eigen::Vector3d read_vec3_mm(const YAML::Node & yaml, const char * key)
@@ -62,10 +76,21 @@ inline BoardConfig load_board_config(const std::string & path)
 {
   BoardConfig c;
   auto yaml = YAML::LoadFile(path);
+  const auto type = yaml["pattern_type"] ? yaml["pattern_type"].as<std::string>() : "circles";
+  if (type == "chessboard") {
+    c.pattern_type = PatternType::Chessboard;
+    if (!yaml["square_size_mm"]) throw std::runtime_error("chessboard 需要 square_size_mm（方格边长）");
+  } else if (type != "circles") {
+    throw std::runtime_error("pattern_type 只支持 circles 或 chessboard: " + type);
+  }
   if (yaml["pattern_cols"]) c.pattern_cols = yaml["pattern_cols"].as<int>();
   if (yaml["pattern_rows"]) c.pattern_rows = yaml["pattern_rows"].as<int>();
-  if (yaml["center_distance_mm"])
+  if (c.chessboard())
+    c.center_distance_mm = static_cast<float>(yaml["square_size_mm"].as<double>());
+  else if (yaml["center_distance_mm"])
     c.center_distance_mm = static_cast<float>(yaml["center_distance_mm"].as<double>());
+  if (c.pattern_cols < 2 || c.pattern_rows < 2 || !(c.center_distance_mm > 0))
+    throw std::runtime_error("标定板行列数需 >=2 且间距 >0");
   if (yaml["R_gimbal2imubody"])
     c.R_gimbal2imubody = yaml["R_gimbal2imubody"].as<std::vector<double>>();
   c.p_yaw_to_pitch_mm = read_vec3_mm(yaml, "p_yaw_to_pitch_mm");
@@ -82,10 +107,10 @@ inline BoardConfig load_board_config(const std::string & path)
 }
 
 // blob 只建一次；灰度缓冲复用；可选降采样检测后再把点乘回全分辨率
-class CircleGridDetector
+class BoardDetector
 {
 public:
-  explicit CircleGridDetector(const BoardConfig & cfg) : cfg_(cfg)
+  explicit BoardDetector(const BoardConfig & cfg) : cfg_(cfg)
   {
     cv::SimpleBlobDetector::Params p;
     p.filterByArea = true;
@@ -128,9 +153,15 @@ public:
       src = &scaled_;
     }
 
-    auto blob = (scale < 1.f) ? blob_preview_ : blob_;
-    bool ok = cv::findCirclesGrid(
-      *src, cfg_.pattern_size(), centers, cv::CALIB_CB_SYMMETRIC_GRID, blob);
+    bool ok;
+    if (cfg_.chessboard()) {
+      // SB 检测自带亚像素精度；全分辨率用 ACCURACY，预览只求快
+      const int flags = full_res ? cv::CALIB_CB_EXHAUSTIVE | cv::CALIB_CB_ACCURACY : cv::CALIB_CB_NORMALIZE_IMAGE;
+      ok = cv::findChessboardCornersSB(*src, cfg_.pattern_size(), centers, flags);
+    } else {
+      auto blob = (scale < 1.f) ? blob_preview_ : blob_;
+      ok = cv::findCirclesGrid(*src, cfg_.pattern_size(), centers, cv::CALIB_CB_SYMMETRIC_GRID, blob);
+    }
     if (ok && scale < 1.f) {
       const float inv = 1.f / scale;
       for (auto & pt : centers) {
@@ -150,8 +181,56 @@ private:
   cv::Mat gray_;
   cv::Mat scaled_;
 };
+using CircleGridDetector = BoardDetector;  // 旧名
 
-// 对称圆点阵 180° 翻转：与上一帧点序更近则整序反转。两序都离得很远时保持检测序。
+// 一张输入图的全分辨率检测结果。图片按 1.jpg、2.jpg… 连续编号，遇到第一张缺失即停止。
+struct Detection
+{
+  int index = 0;
+  std::string path;
+  cv::Size size;
+  bool ok = false;
+  std::vector<cv::Point2f> points;
+};
+
+// 多线程检测整个目录：每线程一个 BoardDetector（内部缓冲不可共享），结果按编号返回。
+// 180° 点序对齐依赖前一张，仍由调用方顺序处理。
+inline std::vector<Detection> detect_folder(
+  const std::string & folder, const BoardConfig & board, unsigned threads = 0)
+{
+  std::vector<Detection> result;
+  for (int i = 1;; i++) {
+    auto path = fmt::format("{}/{}.jpg", folder, i);
+    std::ifstream probe(path, std::ios::binary);
+    if (!probe) break;
+    result.push_back({i, path, {}, false, {}});
+  }
+  if (threads == 0) threads = std::max(1u, std::thread::hardware_concurrency());
+  threads = std::min<unsigned>(threads, std::max<size_t>(1, result.size()));
+  std::atomic<size_t> next{0};
+  std::vector<std::thread> workers;
+  for (unsigned t = 0; t < threads; t++)
+    workers.emplace_back([&] {
+      BoardDetector detector(board);
+      for (size_t k; (k = next++) < result.size();) {
+        auto & d = result[k];
+        const auto image = cv::imread(d.path, cv::IMREAD_GRAYSCALE);
+        if (image.empty()) continue;
+        d.size = image.size();
+        d.ok = detector.detect(image, d.points, true);
+      }
+    });
+  for (auto & worker : workers) worker.join();
+  // 与旧行为一致：遇到第一张无法解码的图片就截断
+  for (size_t k = 0; k < result.size(); k++)
+    if (result[k].size.empty()) {
+      result.resize(k);
+      break;
+    }
+  return result;
+}
+
+// 对称圆点阵 / 棋盘格 180° 翻转：与上一帧点序更近则整序反转。两序都离得很远时保持检测序。
 inline bool align_symmetric_180(
   const std::vector<cv::Point2f> * prev, std::vector<cv::Point2f> & cur, double max_jump_px = 80.0)
 {
@@ -207,12 +286,16 @@ inline std::vector<cv::Point3f> centers_3d_vertical(const BoardConfig & c)
   return points;
 }
 
-inline Eigen::Quaterniond read_q(const std::string & q_path)
+// N.txt：一行 "w x y z"，云台系到世界系的四元数（与 hero::attitude(yaw, pitch) 相同约定）
+inline bool read_q(const std::string & q_path, Eigen::Quaterniond & q)
 {
   std::ifstream q_file(q_path);
   double w, x, y, z;
-  q_file >> w >> x >> y >> z;
-  return {w, x, y, z};
+  if (!(q_file >> w >> x >> y >> z)) return false;
+  q = Eigen::Quaterniond(w, x, y, z);
+  if (!q.coeffs().allFinite() || std::abs(q.norm() - 1) > 1e-3) return false;
+  q.normalize();
+  return true;
 }
 
 inline bool load_intrinsics(
@@ -289,6 +372,95 @@ inline double mean_reproj_error(
   double total = 0;
   for (size_t i = 0; i < projected.size(); i++) total += cv::norm(projected[i] - img[i]);
   return projected.empty() ? 1e9 : total / projected.size();
+}
+
+// hero.yaml 的 camera_rpy、ROS launch_params 的 rpy：URDF 相机本体系（X 前 Y 左 Z 上）到云台的 Z-Y-X 欧拉角，
+// 返回 [roll, pitch, yaw]（rad）。OpenCV 光学系 = 本体系 · R_gimbal2ideal^T。
+inline Eigen::Vector3d camera_rpy_urdf(const Eigen::Matrix3d & R_camera2gimbal)
+{
+  const Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};
+  const Eigen::Matrix3d B = R_camera2gimbal * R_gimbal2ideal;
+  return {std::atan2(B(2, 1), B(2, 2)), -std::asin(std::clamp(B(2, 0), -1.0, 1.0)), std::atan2(B(1, 0), B(0, 0))};
+}
+
+// 一组手眼样本：云台位姿（世界系，mm）、PnP 得到的板到相机位姿（mm）、检测点。
+struct HandEyeSample
+{
+  std::string path;
+  Eigen::Matrix3d R_gimbal2world;
+  Eigen::Vector3d t_gimbal2world_mm;
+  Eigen::Matrix3d R_board2camera;
+  Eigen::Vector3d t_board2camera_mm;
+  std::vector<cv::Point2f> points;
+};
+
+struct ChainCheck
+{
+  double mean_px = 0, max_px = 0;
+  std::string worst;
+  Eigen::Matrix3d R_board2world;
+  Eigen::Vector3d t_board2world_mm;
+};
+
+// 手眼结果的自洽检查：板在世界中固定不动，用结果把每张图串起来——
+//   板(世界) → 世界到云台（串口姿态 + 轴偏置）→ 云台到相机（标定结果）→ 像素，
+// 与检测点比较。board_pose 为空时，用各样本推出的板位姿取平均（适用于只解出相机外参的方法）。
+inline ChainCheck check_chain(
+  const std::vector<HandEyeSample> & samples, const std::vector<cv::Point3f> & board_points,
+  const Eigen::Matrix3d & R_camera2gimbal, const Eigen::Vector3d & t_camera2gimbal_mm, const cv::Mat & K,
+  const cv::Mat & D, const Eigen::Matrix3d * R_board2world = nullptr, const Eigen::Vector3d * t_board2world = nullptr)
+{
+  ChainCheck check;
+  if (R_board2world && t_board2world) {
+    check.R_board2world = *R_board2world;
+    check.t_board2world_mm = *t_board2world;
+  } else {
+    Eigen::Vector4d q_sum = Eigen::Vector4d::Zero();
+    Eigen::Vector3d t_sum = Eigen::Vector3d::Zero();
+    for (const auto & s : samples) {
+      const Eigen::Matrix3d R_c2w = s.R_gimbal2world * R_camera2gimbal;
+      const Eigen::Vector3d t_c2w = s.R_gimbal2world * t_camera2gimbal_mm + s.t_gimbal2world_mm;
+      Eigen::Quaterniond q(R_c2w * s.R_board2camera);
+      if (q_sum.dot(q.coeffs()) < 0) q.coeffs() *= -1;
+      q_sum += q.coeffs();
+      t_sum += R_c2w * s.t_board2camera_mm + t_c2w;
+    }
+    check.R_board2world = Eigen::Quaterniond(q_sum.normalized()).toRotationMatrix();
+    check.t_board2world_mm = t_sum / std::max<size_t>(1, samples.size());
+  }
+  double total = 0;
+  size_t count = 0;
+  for (const auto & s : samples) {
+    const Eigen::Matrix3d R_c2w = s.R_gimbal2world * R_camera2gimbal;
+    const Eigen::Vector3d t_c2w = s.R_gimbal2world * t_camera2gimbal_mm + s.t_gimbal2world_mm;
+    const Eigen::Matrix3d R_b2c = R_c2w.transpose() * check.R_board2world;
+    const Eigen::Vector3d t_b2c = R_c2w.transpose() * (check.t_board2world_mm - t_c2w);
+    cv::Mat R_cv, rvec, tvec;
+    cv::eigen2cv(R_b2c, R_cv);
+    cv::Rodrigues(R_cv, rvec);
+    cv::eigen2cv(t_b2c, tvec);
+    std::vector<cv::Point2f> projected;
+    cv::projectPoints(board_points, rvec, tvec, K, D, projected);
+    double sample_total = 0;
+    for (size_t i = 0; i < projected.size(); i++) sample_total += cv::norm(projected[i] - s.points[i]);
+    const double sample_mean = sample_total / std::max<size_t>(1, projected.size());
+    if (sample_mean > check.max_px) {
+      check.max_px = sample_mean;
+      check.worst = s.path;
+    }
+    total += sample_total;
+    count += projected.size();
+  }
+  check.mean_px = count ? total / count : 0;
+  return check;
+}
+
+inline void print_chain(const ChainCheck & check)
+{
+  fmt::print(
+    "链路重投影（板→世界→云台→相机→像素）: 平均 {:.3f} px，最差一张 {:.3f} px ({})\n"
+    "  经验：平均 < 1 px 可用；> 3 px 检查姿态同步、云台轴偏置、板是否被碰动\n",
+    check.mean_px, check.max_px, check.worst);
 }
 
 inline void write_text(const std::string & path, const std::string & text)

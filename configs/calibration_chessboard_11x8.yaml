@@ -1,0 +1,39 @@
+# 大板：棋盘格，内角点 11×8（即 12×9 个方格），方格边长 35 mm
+# 与 ROS camera_calibration 的 --size 11x8 --square 0.035 是同一块板
+# 除板子参数外，云台偏置、相机、串口与 calibration.yaml 保持一致
+
+pattern_type: chessboard
+pattern_cols: 11
+pattern_rows: 8
+square_size_mm: 35
+
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+# yaw轴中心 -> pitch轴中心（mm，X前 Y左 Z上）；共点云台保持全 0
+p_yaw_to_pitch_mm: [62.11, 0.0, 151.32]
+p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]
+
+# 棋盘格用 findChessboardCornersSB，不读 blob_* 参数
+detect_scale: 0.5
+jpeg_quality: 92
+reproj_max_px: 1.0
+
+camera_name: "hikrobot"
+exposure_ms: 3
+gain: 10.0
+vid_pid: "2bdf:0001"
+
+#####-----cboard参数-----#####
+quaternion_canid: 0x01
+bullet_speed_canid: 0x110
+send_canid: 0xff
+can_interface: "can0"
+
+serial_port: /dev/ttyUSB0
+baud: 921600
+# 0x5A 为弧度。采图四元数按 URDF：yaw +Z，pitch 轴 (0,-1,0)。超过此时差不保存。
+attitude_skew_ms: 20
+
+# 内参：优先 --camera-info=configs/camera_info.yaml；none 时用下面扁平字段
+camera_matrix: [3546.58523, 0.0, 730.97855, 0.0, 3545.36711, 572.93391, 0.0, 0.0, 1.0]
+distort_coeffs: [-0.017987, -0.454369, 0.000994, -0.000664, 0.0]

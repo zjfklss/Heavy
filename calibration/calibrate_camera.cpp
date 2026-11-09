@@ -26,12 +26,10 @@ int main(int argc, char * argv[])
   auto preview = calib::parse_preview(cli.get<std::string>("preview"));
 
   auto board = calib::load_board_config(config_path);
-  calib::CircleGridDetector detector(board);
   auto obj_template = calib::centers_3d_planar(board);
 
   fmt::print(
-    "小圆点板 {}x{} @ {:.1f}mm；preview={}\n", board.pattern_cols, board.pattern_rows,
-    board.center_distance_mm,
+    "标定板 {}；preview={}\n", board.describe(),
     preview == calib::PreviewMode::None     ? "none"
     : preview == calib::PreviewMode::Manual ? "manual"
                                               : "auto");
@@ -42,14 +40,16 @@ int main(int argc, char * argv[])
   std::vector<cv::Point2f> prev_centers;
   bool have_prev = false;
 
-  for (int i = 1; true; i++) {
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto img = cv::imread(img_path);
-    if (img.empty()) break;
-    img_size = img.size();
-
-    std::vector<cv::Point2f> centers;
-    bool ok = detector.detect(img, centers, true);
+  for (auto & detection : calib::detect_folder(input_folder, board)) {
+    const auto & img_path = detection.path;
+    if (!img_size.empty() && detection.size != img_size) {
+      fmt::print(stderr, "{} 尺寸 {}x{} 与前面图片 {}x{} 不同，内参只能用同一分辨率\n", img_path,
+        detection.size.width, detection.size.height, img_size.width, img_size.height);
+      return 1;
+    }
+    img_size = detection.size;
+    auto & centers = detection.points;
+    const bool ok = detection.ok;
     if (ok && calib::align_symmetric_180(have_prev ? &prev_centers : nullptr, centers)) {
       fmt::print("[flip180] {}\n", img_path);
     }
@@ -57,8 +57,10 @@ int main(int argc, char * argv[])
       prev_centers = centers;
       have_prev = true;
     }
-    calib::show_preview(
-      preview, img, board.pattern_size(), centers, ok, "calibrate_camera (q skips window focus)");
+    if (preview != calib::PreviewMode::None)
+      calib::show_preview(
+        preview, cv::imread(img_path), board.pattern_size(), centers, ok,
+        "calibrate_camera (q skips window focus)");
     fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);
     if (!ok) continue;
 
