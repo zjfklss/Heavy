@@ -98,6 +98,9 @@ private:
   Eigen::Vector3d outpost_aim_ = Eigen::Vector3d::Zero();
   std::chrono::steady_clock::time_point outpost_seen_{};
   std::chrono::steady_clock::time_point outpost_fired_{};
+  // 本帧决策时刻：实机=当前时间，离线回放/测试=图像时间戳。锁存的"3 s 释放""发射后冻结"都用它计时，
+  // 这样回放和实机行为一致(不依赖挂钟)。0 表示还没设置，退回挂钟。
+  std::chrono::steady_clock::time_point decide_time_{};
   int last_hit_id_ = -1;
   int lock_id_ = -1;
   bool exit_;

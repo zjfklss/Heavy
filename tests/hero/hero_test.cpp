@@ -194,6 +194,41 @@ void tracking_continuity()
   require(!target.state(), "Three consecutive misses exceed limit");
 }
 
+// 系统级回归：前哨站先正转再反转，最终 w 的符号必须跟着翻过来。
+// 注意：这个测试【不能】单独证明 Target::monitor_outpost_direction 起作用——关掉监测它也会通过，
+// 因为合成数据下反转会让滤波器发散、丢失，重新加锁(set_w)同样能得到正确符号。
+// 监测本身目前只靠实车日志里的 "outpost direction corrected" 验证。
+// 合成数据模拟真实情况：三块板相隔 120°，只有朝向相机 ±0.7 rad 内的板可见，板之间有短暂空档。
+void outpost_direction_correction()
+{
+  // 和 tracker.cpp 里前哨站的初始协方差一致：w 的方差大，加锁前几帧能从观测里学出转向，之后由 set_w 固定
+  Eigen::VectorXd covariance{{1, 64, 1, 64, 1, 9, 0.4, 10, 0.0001, 0, 0}};
+  auto_aim::Target target(3, 0.2765, covariance, 5, 120, 0, 0, 0);
+  auto stamp = hero::Clock::now();
+  double phase = 0;
+  const double rate = 2.5, step = 0.01;
+  auto feed = [&](double direction, double seconds) {
+    for (double t = 0; t < seconds; t += step) {
+      phase += direction * rate * step;
+      stamp += std::chrono::duration_cast<hero::Clock::duration>(std::chrono::duration<double>(step));
+      const auto_aim::Armor * visible = nullptr;
+      auto_aim::Armor armor = observation(auto_aim::outpost);
+      for (int plate = 0; plate < 3; ++plate) {
+        const double angle = tools::limit_rad(phase + plate * 2 * CV_PI / 3);
+        if (std::abs(angle) < 0.7) { armor = observation(auto_aim::outpost, angle); visible = &armor; }
+      }
+      if (target.state()) target.predict(stamp);  // 与 Tracker::update_targets 一致：先预测、再更新
+      target.update(visible, stamp);
+    }
+  };
+  feed(+1, 3.0);
+  require(target.state(), "Outpost stays tracked while spinning forward");
+  require(target.ekf_x()[7] > 1.0, "Forward spin gives positive w");
+  feed(-1, 4.0);
+  require(target.state(), "Outpost stays tracked after the spin reverses");
+  require(target.ekf_x()[7] < -1.0, "Reversed spin flips the sign of w");
+}
+
 void repeated_outpost_window(const std::string & config_path, const YAML::Node & config)
 {
   const double speed = 15.8;
@@ -229,6 +264,7 @@ int main(int argc, char ** argv)
     layers_and_ballistics();
     serial_transport(config);
     tracking_continuity();
+    outpost_direction_correction();
     repeated_outpost_window(argv[1], config);
     tools::ThreadSafeQueue<int> queue(2);
     auto waiter = std::async(std::launch::async, [&] {
@@ -236,7 +272,7 @@ int main(int argc, char ** argv)
     });
     queue.close();
     require(waiter.wait_for(std::chrono::seconds(1)) == std::future_status::ready && waiter.get(), "Queue close wakes consumer");
-    std::cout << "PASS protocol, feedback, pose, layers, ballistics, serial transport, tracking, repeated fire windows, queue shutdown\n";
+    std::cout << "PASS protocol, feedback, pose, layers, ballistics, serial transport, tracking, outpost direction, repeated fire windows, queue shutdown\n";
     return 0;
   } catch (const std::exception & error) { std::cerr << error.what() << '\n'; return 1; }
 }

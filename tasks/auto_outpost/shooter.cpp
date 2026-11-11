@@ -86,7 +86,7 @@ Eigen::Vector3d Shooter::get_outpost_front(const auto_aim::Target & target_origi
     return Eigen::Vector3d::Constant(std::numeric_limits<double>::quiet_NaN());
   }
   const Eigen::Vector3d fresh{hit_point_xy[0], hit_point_xy[1], armors[selected][2]};
-  const auto now = std::chrono::steady_clock::now();
+  const auto now = decide_time_ == std::chrono::steady_clock::time_point{} ? std::chrono::steady_clock::now() : decide_time_;
   if (!outpost_latched_ || now - outpost_seen_ > std::chrono::seconds(3)) {
     outpost_aim_ = fresh;  // 首次或丢失太久：重新锁定
     outpost_latched_ = true;
@@ -158,7 +158,7 @@ io::Command Shooter::shoot(
   if (targets.empty()) {
     last_hit_id_ = -1;
     lock_id_ = -1;
-    if (outpost_latched_ && std::chrono::steady_clock::now() - outpost_seen_ > std::chrono::seconds(3)) outpost_latched_ = false;
+    if (outpost_latched_ && timestamp - outpost_seen_ > std::chrono::seconds(3)) outpost_latched_ = false;
     debug_aim_point_.valid = false;
     return {false, false, 0, 0};
   }
@@ -179,6 +179,7 @@ io::Command Shooter::shoot(
     ekf_x = target_rotate.ekf_x();
 
     Eigen::Vector3d xyz0;
+    decide_time_ = t_decide;
 
     if (target.name == auto_aim::outpost) {  // 反前哨站。不存在高低装甲板
       // tools::logger()->info("anti outpost mode");
@@ -238,7 +239,7 @@ io::Command Shooter::shoot(
           }
           if (target.name == auto_aim::outpost && target.temp_lost_count() > 60) continue;  // 约0.75s没看到任何板：不盲打
           last_fire_ = t_decide;
-          if (target.name == auto_aim::outpost) outpost_fired_ = std::chrono::steady_clock::now();
+          if (target.name == auto_aim::outpost) outpost_fired_ = t_decide;
           io::Command command = {true, true, yaw, direction_ * pitch};
           // data["shoot"] = 1;
           // plotter.plot(data);
