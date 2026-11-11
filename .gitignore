@@ -14,3 +14,8 @@ datasets/
 # 仿真器构建产物与运行产物
 /rm_simulation/build/
 /rm_simulation-artifacts/
+
+# 本地构建/日志/编辑器配置，不进仓库
+/install/
+/log/
+/.vscode/
