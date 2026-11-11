@@ -1,0 +1,4 @@
+upstream: git@github.com:ASLianEFY/sp_jlcv_aimer.git
+commit:   05139611b7f3cf57426e0301575340fc73de62a5
+subject:  Bundle RoboMaster simulation with vision project
+synced:   2026-11-11T22:25:35+08:00

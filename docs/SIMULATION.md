@@ -35,6 +35,18 @@
 
 `--simulation` 不能与 `--video`、`--smoke-test`、`--camera-test`、`--check-config`、`--no-serial`、`--frames` 同时使用。等待连接时 Ctrl+C 退出。
 
+## 更新内置的仿真器快照
+
+`rm_simulation/` 是从上游 `ASLianEFY/sp_jlcv_aimer` 复制的快照，不会自动更新；来源提交记录在 `rm_simulation/UPSTREAM_COMMIT`。上游有更新时：
+
+```bash
+scripts/sync_rm_simulation.sh --check   # 先看会改哪些文件，不动任何东西
+scripts/sync_rm_simulation.sh           # 同步（不提交）
+git diff rm_simulation                  # 审阅，再重新构建并试一次 hero --simulation
+```
+
+脚本只拉上游的 `rm_simulation/` 目录，不会覆盖本仓库自己加的文件（目前是 `configs/scenarios/sensors/hero.json`，清单在脚本的 `LOCAL_ONLY`）。如果上游改了传感器预设的字段格式，需要手动对照更新 `hero.json`。需要指定版本用 `--ref=<分支/标签/提交号>`。
+
 ## 仿真器一侧必须满足
 
 握手时不满足以下条件会直接报错，而不是“连上了但从不开火”：
