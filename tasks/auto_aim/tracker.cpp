@@ -27,12 +27,18 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   targets_[3] = Target(4, 0.2, P0_dig_car, min_detect_count, max_temp_lost_count, 100, 400);        // standard 4
   targets_[4] = Target(4, 0.2, P0_dig_car, min_detect_count, max_temp_lost_count, 100, 400);        // standard 5
   targets_[5] = Target(4, 0.2, P0_dig_car, min_detect_count, max_temp_lost_count, 100, 400);        // sentry
-  targets_[6] = Target(3, 0.2765, P0_dig_outpost, min_detect_count, max_temp_lost_count, 0, 0, 0);  // outpost
+  // 前哨站每转一圈会有板子短暂不可见(>0.1s)，用默认的 max_temp_lost_count 会每圈都丢失并重置滤波器，导致云台抖动
+  const int outpost_temp_lost = yaml["outpost_max_temp_lost_count"] ? yaml["outpost_max_temp_lost_count"].as<int>() : 120;
+  targets_[6] = Target(3, 0.2765, P0_dig_outpost, min_detect_count, outpost_temp_lost, 0, 0, 0);  // outpost
   targets_[7] = Target(3, 0.3205, P0_dig_base, min_detect_count, max_temp_lost_count);              // base
 }
 
 // std::string Tracker::state() const { return state_; }
 
+// 每帧调用。返回当前要打的目标(0 或 1 个)。
+// 两帧间隔超过 0.1 s 视为相机掉线/卡顿，直接清空所有目标。
+// 返回策略：刚进入自瞄，或当前目标已 LOST 时，重新选离图像中心最近的装甲板；否则继续返回原目标
+// (即使本帧没看到它，只要还没 LOST 也会返回，由 Target 自己外推)。
 std::list<Target> Tracker::track(
   std::list<Armor> & armors, std::chrono::steady_clock::time_point t, double yaw, bool use_enemy_color, io::Mode mode)
 {

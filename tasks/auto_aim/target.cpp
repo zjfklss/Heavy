@@ -73,6 +73,9 @@ void Target::set_target(
   jumped = false;
   last_id = 0;
   layer_heights_ = {};
+  dir_has_last_ = false;
+  dir_acc_ = dir_time_ = 0;
+  dir_bad_windows_ = 0;
   temp_lost_count_ = 0;
   t_ = t;
   const Eigen::VectorXd & xyz = armor->xyz_in_world;
@@ -94,6 +97,9 @@ void Target::set_target(
   // tools::logger()->info("set to: {}", ekf_x()[7]);
 }
 
+// 前哨站独有：进入 TRACKING 时调用一次，把 w 设成 ±0.8π(前哨站的实际转速约 2.51 rad/s)，符号取当时滤波器的估计。
+// 目的是防止远距离时滤波器估出的 w 太小，被误认为不旋转。
+// 注意：设完之后 w 的过程噪声为 0，滤波器不会再改它；如果符号设错或前哨站后来反转，需要靠转向监测纠正。
 void Target::set_w()  // 前哨站独有，用前五帧的结果给一个w，防止远距离不认为它在旋转
 {
   // x vx y vy z vz a w r l h
@@ -184,6 +190,8 @@ void Target::clear_target()
   layer_heights_ = {};
 }
 
+// 状态机转移：armor 为空表示这一帧没有匹配到观测。返回 0 表示本帧无观测(调用者据此跳过更新)。
+// 转移规则见 target.hpp 类注释。
 int Target::transition(const Armor * armor, std::chrono::steady_clock::time_point t)
 {
   int flag;
@@ -252,7 +260,7 @@ void Target::update(const Armor * observation, std::chrono::steady_clock::time_p
   const auto & armor = *observation;
 
   // 装甲板匹配
-  int id;
+  int id = 0;  // 观测含 NaN 时所有误差比较都为假，避免 id 未初始化
   auto min_angle_error = 1e10;
   const std::vector<Eigen::Vector4d> & xyza_list = armor_xyza_list();
 
@@ -269,11 +277,18 @@ void Target::update(const Armor * observation, std::chrono::steady_clock::time_p
 
   if (id != 0) jumped = true;
   last_id = id;
-  if (name == outpost && id >= 0 && id < 3 && std::isfinite(armor.xyz_in_world[2]))
-    layer_heights_[id] = armor.xyz_in_world[2];
+  if (name == outpost && id >= 0 && id < 3 && std::isfinite(armor.xyz_in_world[2])) {
+    // 层高度做低通：直接覆盖会把每次观测的 ~1cm 测量噪声变成指令台阶(每转一圈一次，约0.08°@6.6m)
+    // 首次观测直接取值；与已有值差超过5cm视为板号错配，直接重设
+    auto & height = layer_heights_[id];
+    const double z = armor.xyz_in_world[2];
+    if (!height || std::abs(z - *height) > 0.05) height = z;
+    else *height += 0.01 * (z - *height);
+  }
   // tools::logger()->debug("id = {}", id);
 
   update_ypda(armor, id);
+  if (name == outpost && state_ == TRACKING) monitor_outpost_direction(armor, t);
 
   // 发散检测
   if (state_ != LOST && diverged()) {
@@ -286,6 +301,37 @@ void Target::update(const Armor * observation, std::chrono::steady_clock::time_p
     tools::logger()->debug("[Target] Bad Converge Found!");
     state_ = LOST;  // todo 可能要换成更好的重启滤波器方法
   }
+}
+
+void Target::monitor_outpost_direction(const Armor & armor, std::chrono::steady_clock::time_point t)
+{
+  const double yaw = armor.ypr_in_world[0];
+  if (dir_has_last_) {
+    const double dt = tools::delta_time(t, dir_last_t_);
+    const double d = tools::limit_rad(yaw - dir_last_yaw_);
+    // 只累计连续帧；换板(约±2.09rad)或丢帧(间隔>0.1s)的差值丢弃
+    if (dt > 0 && dt < 0.1 && std::abs(d) < 0.6) {
+      dir_acc_ += d;
+      dir_time_ += dt;
+    }
+  }
+  dir_has_last_ = true;
+  dir_last_yaw_ = yaw;
+  dir_last_t_ = t;
+
+  if (dir_time_ < 0.5) return;
+  const double acc = dir_acc_;
+  dir_acc_ = dir_time_ = 0;
+  // 正常转速 0.8π rad/s 时 0.5 s 约转 1.26 rad，0.7 rad 以上才认为转向可信
+  if (std::abs(acc) < 0.7) { dir_bad_windows_ = 0; return; }
+  const double observed_sign = acc > 0 ? 1.0 : -1.0;
+  const double w = ekf_.x[7];
+  if (std::abs(w) >= 0.5 && (w > 0 ? 1.0 : -1.0) == observed_sign) { dir_bad_windows_ = 0; return; }
+  // 与滤波器转向相反(或滤波器认为不转)：连续两个窗口才翻转，避免噪声误判
+  if (++dir_bad_windows_ < 2) return;
+  dir_bad_windows_ = 0;
+  ekf_.x[7] = observed_sign * 0.8 * M_PI;
+  tools::logger()->info("[Target] outpost direction corrected: w {:.3f} -> {:.3f}", w, ekf_.x[7]);
 }
 
 void Target::update_ypda(const Armor & armor, int id)

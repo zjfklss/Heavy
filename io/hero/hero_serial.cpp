@@ -39,6 +39,15 @@ uint16_t crc16(const uint8_t * data, size_t size)
   }
   return crc;
 }
+// 视觉 -> 电控，13 字节：
+//   [0]      帧头 0xA5
+//   [1..4]   pitch  float32(小端，rad)
+//   [5..8]   yaw    float32(小端，rad)
+//   [9]      控制位：0 不控制(电控保持当前姿态)，1 跟随，2 跟随并开火
+//   [10]     保留
+//   [11..12] CRC16(对前 11 字节)，低字节在前
+// 角度非有限数时一律按"不控制"发出，避免把 NaN 发给云台。
+// 注意：云台是否真的听从这个指令，由电控侧(遥控器的自瞄使能)决定，视觉侧不知道也无法替代。
 std::array<uint8_t, 13> encode(const io::Command & command)
 {
   std::array<uint8_t, 13> bytes{};
@@ -52,6 +61,14 @@ std::array<uint8_t, 13> encode(const io::Command & command)
   bytes[12] = crc >> 8;
   return bytes;
 }
+// 电控 -> 视觉，16 字节(从缓冲区里按帧头 0x5A + CRC16 逐帧解析，坏帧丢一个字节重新同步)：
+//   [0]      帧头 0x5A
+//   [1]      标志位：bit0 敌方颜色，bit1~3 比赛状态，bit4 前哨站状态，bit5 重置 tracker，bit6 相机状态
+//   [2..5]   当前云台 pitch float32
+//   [6..9]   当前云台 yaw   float32
+//   [10..13] 弹速 float32(m/s)
+//   [14..15] CRC16(对前 14 字节)
+// 注意：协议里没有"自瞄按键"字段。
 std::vector<Feedback> parse(std::vector<uint8_t> & buffer)
 {
   std::vector<Feedback> result;

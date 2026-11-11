@@ -65,6 +65,12 @@ struct DecisionOutput
   auto_outpost::AimPoint aim{false, Eigen::Vector4d::Zero()};
   uint64_t epoch = 0;
 };
+// 决策线程：把"每帧视觉结果"变成"云台指令"并发给串口。
+// 视觉线程(检测+跟踪)每帧 push 一个 DecisionInput，决策线程独立循环：
+//   - 实机(realtime_)下反复(最快每 1 ms 一次，实测约 370 Hz)用最新输入重算(按"现在"外推)，所以指令频率远高于检测帧率；
+//   - 输入过期(超过 decision_timeout)或云台反馈无效时，不输出控制(发 0 包)，防止用旧数据乱动云台；
+//   - --no-fire 时仍跟随目标，只把开火位清掉。
+// 视觉线程用 finish_frame() 等待本帧决策完成，保证回放/测试时结果可复现。
 class Decisions
 {
 public:
@@ -205,6 +211,9 @@ private:
 };
 }
 
+// 英雄自瞄主流程：相机/视频 -> 检测 -> (按串口回传的姿态)解算到世界系 -> Tracker 跟踪 -> 决策线程 -> 串口。
+// 串口反馈的 epoch 变化(断线重连、敌方颜色改变、电控要求重置)时，会重建 Tracker，丢弃旧的跟踪状态。
+// 常用参数：--show 调试面板；--no-fire 跟随但不开火；--video 离线回放；--simulation 仿真；--check-config 只校验配置。
 int run_hero(int argc, char ** argv, tools::jlcv_show::Channel * display)
 {
   const std::string keys =

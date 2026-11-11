@@ -210,7 +210,7 @@ void repeated_outpost_window(const std::string & config_path, const YAML::Node &
   const auto command = shooter.shoot({target}, start, speed, false, ypr);
   require(command.control && command.shoot, "Highest layer enters first fire window");
   const auto same_window = shooter.shoot({target}, start + std::chrono::milliseconds(1), speed, false, ypr);
-  require(same_window.shoot, "Valid fire window is a level, not a single decision pulse");
+  require(same_window.control && !same_window.shoot, "One fire pulse per window, no double fire in the same pass");
   const auto outside = shooter.shoot({target}, start + std::chrono::milliseconds(10), speed, false, ypr);
   require(outside.control && !outside.shoot, "Fire clears immediately outside phase window");
   const auto period = std::chrono::duration_cast<hero::Clock::duration>(std::chrono::duration<double>(2 * CV_PI / angular_speed));

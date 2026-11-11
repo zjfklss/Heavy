@@ -13,6 +13,8 @@
 
 namespace auto_aim
 {
+// Tracker：为每种敌人(ENEMY_NUM 个，下标即 ArmorName)各维护一个 Target，每帧用检测到的装甲板更新它们，
+// 并决定"当前该打哪一个"：没锁定时选离图像中心最近的装甲板，已锁定且没丢就一直打它。
 class Tracker
 {
 public:
