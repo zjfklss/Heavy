@@ -1,55 +1,82 @@
-enemy_color: blue
+# ==================== 基本设置 ====================
+enemy_color: blue  # 敌方颜色，只能是 blue 或 red
+
+# ==================== 坐标变换 / 手眼标定 ====================
+# 云台坐标系 -> IMU 本体坐标系 的旋转矩阵（3x3，按行展开）
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+# 相机内参矩阵 [fx, 0, cx, 0, fy, cy, 0, 0, 1]，单位：像素
 camera_matrix: [3546.58523, 0, 730.97855, 0, 3545.36711, 572.93391, 0, 0, 1]
+# 畸变系数 [k1, k2, p1, p2, k3]
 distort_coeffs: [-0.017987, -0.454369, 0.000994, -0.000664, 0]
+# 相机坐标系 -> 云台坐标系 的旋转矩阵（3x3，按行展开，由手眼标定得到）
 R_camera2gimbal: [0.015486380922, -0.278414778347, 0.960336078258, -0.999880078812, -0.004312154430, 0.014873914018, 0, -0.960451256713, -0.278448170182]
+# 相机坐标系 -> 云台坐标系 的平移向量 [x, y, z]，单位：m
 t_camera2gimbal: [0.1829655065037275, -0.053276816072084718, 0.092411361124234953]
+# 相机本体姿态 [roll, pitch, yaw]，单位：rad（与 URDF / ROS launch 参数中的 rpy 一致）
 camera_rpy: [0, 0.282178, 0.015487]
-camera_serial: DA1830770
-image_width: 1440
-image_height: 1080
-exposure_ms: 3
-gain: 16
-fps: 165
-pixel_format: bayer_rg8
-image_node_num: 8
-offset_x: 0
-offset_y: 0
-trigger_enable: false
-frame_rate_enable: true
-device: CPU
-yolo_name: yolov5
-yolov5_model_path: ../assets/yolov5.xml
-classify_model: ../assets/classify_net.onnx
-threshold: 150
-max_angle_error: 45
-min_lightbar_ratio: 2
-max_lightbar_ratio: 20
-min_lightbar_length: 8
-min_armor_ratio: 1
-max_armor_ratio: 5
-max_side_ratio: 1.3
-max_rectangular_error: 25
-min_confidence: 0.8
-min_detect_count: 20
-max_temp_lost_count: 10
-use_roi: false
-roi: {x: 0, y: 0, width: 1440, height: 1080}
-yaw_offset: 0
-pitch_offset: 0
-direction: 1
-shoot_delay: 0.075
-mouse_to_fire: 0.075
-k_air_resistance: 0.0068
-layer_height_threshold: 0.04
-max_fire_error_yaw: 0.2
-max_fire_error_pitch: 0.1
-max_shoot_angle: 40
+
+# ==================== 海康工业相机 ====================
+camera_serial: DA1830770      # 相机序列号，用于选择指定相机
+image_width: 1440             # 图像宽度，单位：像素
+image_height: 1080            # 图像高度，单位：像素
+exposure_ms: 3                # 曝光时间，单位：ms（必须 > 0）
+gain: 16                      # 增益
+fps: 165                      # 采集帧率（必须 > 0）
+pixel_format: bayer_rg8       # 像素格式
+image_node_num: 8             # SDK 图像缓存节点数量
+offset_x: 0                   # 采集区域 X 偏移，单位：像素
+offset_y: 0                   # 采集区域 Y 偏移，单位：像素
+trigger_enable: false         # 是否启用外部触发
+frame_rate_enable: true       # 是否启用帧率限制（按 fps 采集）
+
+# ==================== 神经网络推理 ====================
+device: CPU                                 # OpenVINO 推理设备
+yolo_name: yolov5                           # 检测网络类型，当前多线程流程只支持 yolov5
+yolov5_model_path: ../assets/yolov5.xml     # YOLOv5 模型路径（相对本配置文件所在目录；同目录下需有同名 .bin 权重）
+classify_model: ../assets/classify_net.onnx # 装甲板数字分类网络路径（相对本配置文件所在目录）
+
+# ==================== 传统视觉装甲板检测 ====================
+threshold: 150                # 灰度图二值化阈值
+max_angle_error: 45           # 灯条相对竖直方向的最大倾斜角，单位：度
+min_lightbar_ratio: 2         # 灯条最小长宽比
+max_lightbar_ratio: 20        # 灯条最大长宽比
+min_lightbar_length: 8        # 灯条最小长度，单位：像素
+min_armor_ratio: 1            # 装甲板最小长宽比
+max_armor_ratio: 5            # 装甲板最大长宽比
+max_side_ratio: 1.3           # 左右两灯条长度之比的上限
+max_rectangular_error: 25     # 装甲板偏离矩形的最大角度误差，单位：度
+min_confidence: 0.8           # 数字分类的最小置信度
+
+# ==================== 目标跟踪 ====================
+min_detect_count: 20          # 连续识别超过该帧数才认为目标稳定，进入跟踪状态
+max_temp_lost_count: 10       # 暂时丢失超过该帧数则判定目标丢失
+
+# ==================== ROI ====================
+use_roi: false                                # 是否只在 ROI 区域内做 YOLO 检测
+roi: {x: 0, y: 0, width: 1440, height: 1080}  # ROI 区域（左上角坐标与宽高），单位：像素
+
+# ==================== 瞄准 / 射击 ====================
+yaw_offset: 0                 # yaw 补偿，单位：度
+pitch_offset: 0               # pitch 补偿，单位：度
+direction: 1                  # pitch 正方向：气动发射为 1，摩擦轮为 -1
+shoot_delay: 0.075            # 发出开火指令到弹丸实际射出的延迟，单位：s
+mouse_to_fire: 0.075          # 鼠标操控时，发射命令到摩擦轮减速（弹丸射出）的延迟，单位：s
+k_air_resistance: 0.0068      # 弹道模型的空气阻力系数
+layer_height_threshold: 0.04  # 已弃用：前哨站现在固定打最高层，不再按该阈值就近换层。仅为兼容旧配置/测试保留，单位：m
+max_fire_error_yaw: 0.2       # 允许开火的最大 yaw 跟随误差，单位：rad
+max_fire_error_pitch: 0.1     # 允许开火的最大 pitch 跟随误差，单位：rad
+max_shoot_angle: 40           # 装甲板相对正对方向的最大可击打角度，超过则换打另一块，单位：度
+outpost_fire_window: 0.01     # 前哨站开火相位窗口，单位：rad（0.01≈0.57°；旧版 jlauto-aim 为 8~12°）。不写则默认 0.01
+fire_refractory_ratio: 0.5    # 防连发：两次开火最小间隔 = 该比例 × 相邻两块板经过的时间；0 关闭。不写则默认 0.5
+
+# ==================== 下位机串口通信 ====================
 serial:
-  device: /dev/ttyUSB0
-  baud_rate: 921600
-  timestamp_offset: 0.006
-  timeout: 0.1
-  bullet_speed: 15.8
-  bullet_speed_alpha: 0.15
-decision_timeout: 0.1
+  device: /dev/ttyUSB0        # 串口设备路径
+  baud_rate: 921600           # 波特率，只支持 921600 或 115200
+  timestamp_offset: 0.006     # 收到数据时的时间戳补偿，单位：s
+  timeout: 0.1                # 串口反馈数据（IMU 等）的有效期，超时视为无效，单位：s
+  bullet_speed: 15.8          # 默认弹速，下位机尚未反馈弹速时使用，单位：m/s（要求 10~20）
+  bullet_speed_alpha: 0.15    # 弹速指数平滑系数，取值范围 (0, 1]，越大越相信最新测量值
+
+# ==================== 决策 ====================
+decision_timeout: 0.1         # 决策输入（图像/姿态）的最长有效时间，超时则不使用，单位：s
