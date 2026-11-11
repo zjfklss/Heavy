@@ -1,0 +1,77 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RM_SIM_ARTIFACT_DIR": "${sourceParentDir}/rm_simulation-artifacts"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "cacheVariables": {
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "test",
+      "inherits": "base",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "core",
+      "inherits": "base",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "RM_SIM_BUILD_CLI": "OFF",
+        "RM_SIM_BUILD_QT": "OFF",
+        "RM_SIM_CAMERA_GPU": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "jobs": 4
+    },
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "jobs": 4
+    },
+    {
+      "name": "core",
+      "configurePreset": "core",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "core",
+      "configurePreset": "core",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

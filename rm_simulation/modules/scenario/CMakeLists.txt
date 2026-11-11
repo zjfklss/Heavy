@@ -1,0 +1,4 @@
+find_package(nlohmann_json REQUIRED)
+add_library(rm_sim_scenario src/scenario.cpp)
+target_include_directories(rm_sim_scenario PUBLIC include)
+target_link_libraries(rm_sim_scenario PUBLIC rm_sim_world nlohmann_json::nlohmann_json)

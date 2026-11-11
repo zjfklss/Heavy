@@ -4,11 +4,13 @@
 
 ## 快速开始
 
-仿真工程放在本仓库的同级目录（`../rm_simulation`），或用 `--sim-project=绝对路径` 指定：
+仿真工程的源码快照已经放在本仓库的 `rm_simulation/`（来自 sp_jlcv_aimer，首次运行会自动构建，需要 Qt5、libpng、nlohmann-json）。默认优先用它，没有时退回同级目录 `../rm_simulation`，也可以用 `--sim-project=绝对路径` 指定：
+
+注意：快照里的 `configs/scenarios/sensors/hero.json` 是本仓库新增的英雄预设，相机内参、手眼外参和弹速取自 `configs/hero.yaml`；改了 `hero.yaml` 里的标定后，要同步改这个预设。
 
 ```bash
 ./build/hero --simulation --show                         # 自动打开仿真 UI
-./build/hero --simulation --sim-preset=infantry4 --show  # 仿真器没有 hero 预设时借用其他场景
+./build/hero --simulation --sim-preset=infantry4 --show  # 借用步兵预设：它的弹速 23 m/s 会被英雄检查拒绝，需先在仿真 UI 里改成 10~20
 ```
 
 程序会调用 `<仿真工程>/start_simulation.sh`，打开 `configs/scenarios/sensors/<预设>.json` 对应的仿真 UI。预设默认 `hero`；`--sim-preset` 可写预设名或 JSON 路径。程序在 `rm_simulation-artifacts/runs/hero/` 生成本次运行用的 JSON（不改原 JSON），并在退出时关闭本次启动的仿真 UI 和后端。`RM_SIM_ARTIFACT_DIR` 可改产物目录。
@@ -24,7 +26,7 @@
 | --- | --- | --- |
 | 第一个位置参数 | `configs/simulation/hero.yaml` | 仿真用配置 |
 | `--sim-ui` | `true` | 是否自动启动仿真 UI |
-| `--sim-project` | `../rm_simulation` | 仿真工程目录 |
+| `--sim-project` | `rm_simulation/`（没有则 `../rm_simulation`） | 仿真工程目录 |
 | `--sim-preset` | `hero` | 仿真场景预设名或 JSON 路径 |
 | `--sim-host` / `--sim-port` | `127.0.0.1` / `17001` | 自瞄端监听地址 |
 | `--sim-once` | `false` | 一个回合后退出；默认断开后继续等下一回合 |

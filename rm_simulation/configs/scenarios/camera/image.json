@@ -1,0 +1,20 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "相机图像采样",
+    "duration": 3,
+    "sample_period": 0.02,
+    "targets": [{"id": "target", "kind": "car", "position": [3, 0, 0.3],
+      "translation": [{}, {"kind": "sinusoidal", "amplitude": 0.4, "frequency": 3, "phase": 1.5707963267948966}, {}],
+      "rotation": {"kind": "velocity", "velocity": 0.5}}]
+  },
+  "sensor": {
+    "output": "image",
+    "frequency": 60,
+    "latency": 0.012,
+    "calibration": {"id": "synthetic-pinhole-v1", "width": 1280, "height": 720, "fx": 1200, "fy": 1200, "cx": 640, "cy": 360},
+    "image": {"color": "blue", "light_length": 0.056, "light_width": 0.01, "small_light_spacing": 0.135, "big_light_spacing": 0.23, "noise_sigma": 0}
+  },
+  "algorithm": {"kind": "none"}
+}

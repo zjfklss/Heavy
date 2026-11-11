@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/controls">
+    <file alias="chevron-down.svg">icons/chevron-down.svg</file>
+    <file alias="plus.svg">icons/plus.svg</file>
+    <file alias="minus.svg">icons/minus.svg</file>
+  </qresource>
+</RCC>

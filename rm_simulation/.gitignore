@@ -1,0 +1,9 @@
+# Build configurations are grouped under build/; work artifacts live outside the project.
+# Ignore compiler state and local editor settings.
+/build*/
+/outputs/
+/CMakeUserPresets.json
+/CMakeCache.txt
+/CMakeFiles/
+*.user
+__pycache__/

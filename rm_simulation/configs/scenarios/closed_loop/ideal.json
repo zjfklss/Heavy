@@ -1,0 +1,14 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "理想几何观测与执行器闭环（无重力基准）",
+    "duration": 3,
+    "sample_period": 0.02,
+    "world": {"gravity": [0, 0, 0]},
+    "targets": [{"id": "target", "kind": "car", "position": [4, 0, 0.3]}]
+  },
+  "sensor": {"output": "features", "frequency": 60, "seed": 11},
+  "actuator": {"ideal": true, "initial_yaw": 0.15, "muzzle_speed": 23},
+  "algorithm": {"kind": "pixel_servo", "fire_interval": 0.2}
+}

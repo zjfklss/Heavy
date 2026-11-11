@@ -1,0 +1,3 @@
+add_library(rm_sim_protocol INTERFACE)
+target_include_directories(rm_sim_protocol INTERFACE include)
+target_link_libraries(rm_sim_protocol INTERFACE rm_sim_world)

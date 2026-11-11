@@ -1,0 +1,4 @@
+add_library(rm_sim_actuators src/actuators.cpp)
+target_include_directories(rm_sim_actuators PUBLIC include)
+target_link_libraries(rm_sim_actuators PUBLIC rm_sim_protocol)
+rm_sim_enable_warnings(rm_sim_actuators)

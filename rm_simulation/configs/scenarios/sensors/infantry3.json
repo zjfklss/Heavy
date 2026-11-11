@@ -1,0 +1,199 @@
+{
+    "actuator": {
+        "base_pose": {
+            "rotation": [
+                [
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    1
+                ]
+            ],
+            "translation": [
+                0,
+                0,
+                0.3
+            ]
+        },
+        "camera_mount": {
+            "rotation": [
+                [
+                    0,
+                    -1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    -1
+                ],
+                [
+                    1,
+                    0,
+                    0
+                ]
+            ],
+            "translation": [
+                0.00352,
+                0,
+                0.0975
+            ]
+        },
+        "command_latency": 0,
+        "encoder_sigma": 0,
+        "feedback_enabled": true,
+        "feedback_frequency": 200,
+        "feedback_latency": 0,
+        "feedback_seed": 3,
+        "fire_interval": 0.1,
+        "fire_latency": 0,
+        "ideal": true,
+        "inherit_muzzle_velocity": true,
+        "initial_pitch": 0,
+        "initial_yaw": 0,
+        "max_acceleration": 60,
+        "max_speed": 6,
+        "muzzle_mount": {
+            "rotation": [
+                [
+                    1,
+                    0,
+                    0
+                ],
+                [
+                    0,
+                    1,
+                    0
+                ],
+                [
+                    0,
+                    0,
+                    1
+                ]
+            ],
+            "translation": [
+                0,
+                0,
+                0
+            ]
+        },
+        "muzzle_speed": 22.1,
+        "muzzle_speed_sigma": 0,
+        "pitch_max": 1.0471975511965976,
+        "pitch_min": -1.0471975511965976,
+        "pitch_offset": [
+            0,
+            0,
+            0
+        ],
+        "response_time": 0.04,
+        "seed": 2,
+        "shot_lifetime": 3,
+        "wrap_yaw": true,
+        "yaw_max": 3.141592653589793,
+        "yaw_min": -3.141592653589793,
+        "yaw_offset": [
+            0,
+            0,
+            0
+        ]
+    },
+    "algorithm": {
+        "adapter": "sp_vision",
+        "connect_timeout": 5,
+        "host": "127.0.0.1",
+        "kind": "external",
+        "port": 17001,
+        "step_timeout": 1
+    },
+    "closed_loop_version": 1,
+    "commands": [
+    ],
+    "runner": {
+        "algorithm_frequency": 200,
+        "log_frequency": 50
+    },
+    "scene": {
+        "duration": 3,
+        "events": [
+        ],
+        "name": "infantry3 传感器配置",
+        "sample_period": 0.02,
+        "schema_version": 1,
+        "shots": [
+        ],
+        "targets": [
+            {
+                "id": "target",
+                "kind": "car",
+                "position": [
+                    3,
+                    0.4,
+                    0.3
+                ],
+                "translation": [
+                    {
+                        "kind": "velocity",
+                        "velocity": 0
+                    },
+                    {
+                        "kind": "stationary"
+                    },
+                    {
+                    }
+                ]
+            }
+        ],
+        "world": {
+            "detection_interval": 0.05,
+            "gravity": [
+                0,
+                0,
+                -9.81
+            ],
+            "ground_z": 0,
+            "minimum_normal_speed": 12,
+            "timestep": 0.001
+        }
+    },
+    "sensor": {
+        "appearances": {
+        },
+        "calibration": {
+            "cx": 757.42397,
+            "cy": 523.97936,
+            "fx": 2380.0016,
+            "fy": 2382.68998,
+            "height": 1080,
+            "id": "jlcv-infantry3-pinhole-v1",
+            "width": 1440
+        },
+        "dropout": 0,
+        "enabled": true,
+        "false_positive_probability": 0,
+        "frequency": 165,
+        "id": "infantry3-camera",
+        "image": {
+            "big_light_spacing": 0.23,
+            "color": "blue",
+            "light_length": 0.056,
+            "light_width": 0.01,
+            "noise_sigma": 0,
+            "small_light_spacing": 0.135
+        },
+        "latency": 0,
+        "output": "image",
+        "pixel_sigma": 0,
+        "seed": 1,
+        "surface_occlusion": false
+    }
+}

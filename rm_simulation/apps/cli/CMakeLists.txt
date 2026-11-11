@@ -1,0 +1,5 @@
+add_executable(rm_sim scene_main.cpp)
+target_link_libraries(rm_sim PRIVATE rm_sim_scenario)
+add_executable(rm_sim_loop loop_main.cpp)
+target_link_libraries(rm_sim_loop PRIVATE rm_sim_runner rm_sim_scenario rm_sim_recording rm_sim_adapters)
+rm_sim_enable_warnings(rm_sim_loop)

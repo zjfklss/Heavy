@@ -1,0 +1,11 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "SP 自瞄双向通信",
+    "duration": 3,
+    "targets": [{"id": "target", "kind": "car", "position": [3, 0.2, 0.3]}]
+  },
+  "sensor": {"output": "image", "frequency": 60, "calibration": {"width": 1440, "height": 1080, "fx": 2400, "fy": 2400, "cx": 720, "cy": 540}},
+  "algorithm": {"kind": "external", "adapter": "sp_vision", "host": "127.0.0.1", "port": 17001, "connect_timeout": 10, "step_timeout": 10}
+}

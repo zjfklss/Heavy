@@ -1,0 +1,10 @@
+add_library(rm_sim_world src/world.cpp)
+target_include_directories(rm_sim_world PUBLIC include)
+target_compile_features(rm_sim_world PUBLIC cxx_std_17)
+rm_sim_enable_warnings(rm_sim_world)
+
+if(BUILD_TESTING)
+  add_executable(rm_sim_world_test tests/world_test.cpp)
+  target_link_libraries(rm_sim_world_test PRIVATE rm_sim_world)
+  add_test(NAME rm_sim_world COMMAND rm_sim_world_test)
+endif()

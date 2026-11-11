@@ -28,6 +28,9 @@ namespace fs = std::filesystem;
 fs::path simulator_project(const std::string & project)
 {
   if (!project.empty()) return fs::absolute(project);
+  // 优先用仓库内置的快照(Heavy/rm_simulation)，没有再退回同级目录，和 sp_jlcv_aimer 的行为一致
+  const auto bundled = fs::path(HERO_SOURCE_ROOT) / "rm_simulation";
+  if (fs::is_directory(bundled)) return bundled;
   return fs::path(HERO_SOURCE_ROOT).parent_path() / "rm_simulation";
 }
 }  // namespace

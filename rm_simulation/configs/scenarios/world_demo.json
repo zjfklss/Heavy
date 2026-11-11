@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "四装甲板车 / 前哨站 / 大小能量机关",
+  "duration": 12,
+  "sample_period": 0.02,
+  "targets": [
+    {"id":"car_random", "kind":"car", "position":[4,-1.4,0.3],
+     "translation":[{"kind":"random","amplitude":1.8,"frequency":2,"seed":27},
+                    {"kind":"random","amplitude":1.8,"frequency":1.6,"seed":26},{}],
+     "rotation":{"kind":"velocity","velocity":7}},
+    {"id":"car_stationary", "kind":"car", "position":[4,1.3,0.3]},
+    {"id":"outpost", "kind":"outpost", "position":[7,0,0.3], "direction":-1},
+    {"id":"small_rune", "kind":"small_rune", "position":[9,2.6,2.6],"seed":27},
+    {"id":"big_rune", "kind":"big_rune", "position":[9,-2.6,2.6],
+     "direction":-1,"rune_a":0.9,"rune_omega":1.95,"seed":26}
+  ],
+  "shots": [
+    {"id":"car_center_hit", "time":0.2, "origin":[0,1.3,0.3], "velocity":[23,0,0.7997282608695652]},
+    {"id":"car_miss", "time":0.5, "origin":[0,1.6,0.3], "velocity":[23,0,0.7997282608695652]},
+    {"id":"car_hit_again", "time":1.0, "origin":[0,1.3,0.3], "velocity":[23,0,0.7997282608695652]}
+  ],
+  "events":[{"time":8,"type":"stop_outpost","target_id":"outpost"}]
+}

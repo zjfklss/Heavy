@@ -10,3 +10,7 @@ MvSdkLog/
 datasets/
 /third_party/foxglove/
 /$(ALLUSERSPROFILE)/
+
+# 仿真器构建产物与运行产物
+/rm_simulation/build/
+/rm_simulation-artifacts/

@@ -1,0 +1,22 @@
+{
+  "schema_version":1, "name":"平移、旋转、加速、变加速与随机运动", "duration":6, "sample_period":0.02,
+  "targets":[
+    {"id":"stationary","kind":"car","position":[3,-5,0.3]},
+    {"id":"translation","kind":"car","position":[3,-3,0.3],
+     "translation":[{"kind":"velocity","velocity":0.5},{},{}]},
+    {"id":"spin","kind":"car","position":[3,-1,0.3],
+     "rotation":{"kind":"velocity","velocity":7}},
+    {"id":"accelerating","kind":"car","position":[3,1,0.3],
+     "translation":[{"kind":"acceleration","velocity":0.1,"acceleration":0.12},{},{}],
+     "rotation":{"kind":"acceleration","acceleration":0.8}},
+    {"id":"changing_acceleration","kind":"car","position":[3,3,0.3],
+     "translation":[{"kind":"jerk","jerk":0.06},{},{}],
+     "rotation":{"kind":"jerk","velocity":1,"jerk":0.2}},
+    {"id":"periodic_acceleration","kind":"car","position":[3,5,0.3],
+     "translation":[{"kind":"sinusoidal","amplitude":1,"frequency":2,"phase":1.5707963267948966},{},{}],
+     "rotation":{"kind":"sinusoidal","velocity":3,"amplitude":2,"frequency":2}},
+    {"id":"random","kind":"car","position":[7,0,0.3],
+     "translation":[{"kind":"random","amplitude":2,"seed":41},{"kind":"random","amplitude":2,"seed":42},{}],
+     "rotation":{"kind":"random","amplitude":12,"frequency":2,"seed":43}}
+  ]
+}

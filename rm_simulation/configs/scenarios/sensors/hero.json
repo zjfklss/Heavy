@@ -1,0 +1,70 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "hero 传感器配置",
+    "duration": 3,
+    "targets": [
+      {
+        "id": "target",
+        "kind": "car",
+        "position": [
+          3,
+          0.2,
+          0.3
+        ]
+      }
+    ]
+  },
+  "sensor": {
+    "enabled": true,
+    "id": "hero-camera",
+    "output": "image",
+    "frequency": 165.0,
+    "latency": 0,
+    "calibration": {
+      "id": "jlcv-hero-pinhole-v1",
+      "width": 1440,
+      "height": 1080,
+      "fx": 3546.58523,
+      "fy": 3545.36711,
+      "cx": 730.97855,
+      "cy": 572.93391
+    },
+    "image": {
+      "color": "blue",
+      "noise_sigma": 0
+    }
+  },
+  "actuator": {
+    "camera_mount": {
+      "translation": [
+        0.1829655065037275,
+        -0.05327681607208472,
+        0.09241136112423495
+      ],
+      "rotation": [
+        [
+          0.015486380922,
+          -0.999880078812,
+          0
+        ],
+        [
+          -0.278414778347,
+          -0.00431215443,
+          -0.960451256713
+        ],
+        [
+          0.960336078258,
+          0.014873914018,
+          -0.278448170182
+        ]
+      ]
+    },
+    "feedback_enabled": true,
+    "muzzle_speed": 15.8
+  },
+  "algorithm": {
+    "kind": "none"
+  }
+}

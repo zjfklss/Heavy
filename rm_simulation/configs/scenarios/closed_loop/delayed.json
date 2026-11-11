@@ -1,0 +1,17 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "带采样延迟、像素噪声与执行器响应的闭环",
+    "duration": 3,
+    "world": {"gravity": [0, 0, 0]},
+    "targets": [{"id": "target", "kind": "car", "position": [4, 0, 0.3],
+      "translation": [{}, {"kind": "sinusoidal", "amplitude": 0.2, "frequency": 2, "phase": 1.5707963267948966}, {}]}]
+  },
+  "sensor": {"output": "features", "frequency": 144, "latency": 0.012, "pixel_sigma": 0.4, "dropout": 0.05, "seed": 11},
+  "actuator": {"ideal": false, "initial_yaw": 0.15, "command_latency": 0.004,
+    "fire_latency": 0.01, "fire_interval": 0.1, "max_speed": 3, "max_acceleration": 30,
+    "response_time": 0.04, "feedback_latency": 0.004, "encoder_sigma": 0.0001,
+    "muzzle_speed_sigma": 0.1, "seed": 12, "feedback_seed": 13},
+  "algorithm": {"kind": "pixel_servo", "fire_interval": 0.2}
+}

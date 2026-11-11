@@ -1,0 +1,70 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "infantry4 传感器配置",
+    "duration": 3,
+    "targets": [
+      {
+        "id": "target",
+        "kind": "car",
+        "position": [
+          3,
+          0.2,
+          0.3
+        ]
+      }
+    ]
+  },
+  "sensor": {
+    "enabled": true,
+    "id": "infantry4-camera",
+    "output": "image",
+    "frequency": 165.0,
+    "latency": 0,
+    "calibration": {
+      "id": "jlcv-infantry4-pinhole-v1",
+      "width": 1440,
+      "height": 1080,
+      "fx": 2401.58975,
+      "fy": 2400.28763,
+      "cx": 710.13204,
+      "cy": 556.41941
+    },
+    "image": {
+      "color": "blue",
+      "noise_sigma": 0
+    }
+  },
+  "actuator": {
+    "camera_mount": {
+      "translation": [
+        0.00352,
+        0.0,
+        0.0975
+      ],
+      "rotation": [
+        [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    "feedback_enabled": true,
+    "muzzle_speed": 23.0
+  },
+  "algorithm": {
+    "kind": "none"
+  }
+}

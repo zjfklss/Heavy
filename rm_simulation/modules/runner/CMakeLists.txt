@@ -1,0 +1,5 @@
+find_package(Threads REQUIRED)
+add_library(rm_sim_runner src/runner.cpp src/live_runner.cpp)
+target_include_directories(rm_sim_runner PUBLIC include)
+target_link_libraries(rm_sim_runner PUBLIC rm_sim_sensors rm_sim_actuators Threads::Threads)
+rm_sim_enable_warnings(rm_sim_runner)

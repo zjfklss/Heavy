@@ -1,0 +1,11 @@
+{
+  "closed_loop_version": 1,
+  "scene": {
+    "schema_version": 1,
+    "name": "独立进程通用协议",
+    "duration": 3,
+    "targets": [{"id": "target", "kind": "car", "position": [3, 0, 0.3]}]
+  },
+  "sensor": {"output": "image", "frequency": 60, "calibration": {"width": 640, "height": 480, "fx": 600, "fy": 600, "cx": 320, "cy": 240}},
+  "algorithm": {"kind": "external", "adapter": "generic", "host": "127.0.0.1", "port": 17001, "connect_timeout": 5, "step_timeout": 1}
+}

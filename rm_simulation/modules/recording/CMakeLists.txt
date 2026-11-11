@@ -1,0 +1,5 @@
+find_package(PNG REQUIRED)
+add_library(rm_sim_recording src/image_io.cpp)
+target_include_directories(rm_sim_recording PUBLIC include)
+target_link_libraries(rm_sim_recording PUBLIC rm_sim_sensors PRIVATE PNG::PNG)
+rm_sim_enable_warnings(rm_sim_recording)
