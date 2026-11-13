@@ -5,7 +5,6 @@
 ## 目录
 
 - 技术路线：`docs/重装自动对矿技术路线.md`
-- 实施方案：`docs/重装自动对矿实施方案.docx`
 - 仿真运行时：`ore_sim/hkust_runtime/`（港科 RM2026 ROS 2 + MuJoCo，尚未接入）
 - 复用内容：`tools/`、`calibration/`、`io/camera.*`、`io/hikrobot/`、标定配置与圆点板
 
