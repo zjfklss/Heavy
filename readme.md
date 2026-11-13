@@ -21,14 +21,16 @@ cmake --build build -j4
 
 仿真基于港科 RM2026 的 ROS 2 + MuJoCo 运行时，在 `ore_sim/hkust_runtime` 内单独用 colcon 构建。
 
-本机依赖在 `~/hkust-enterprize/RM2026-Engineer-Assembly-Algorithm/.venv`，先链接过来：
+仿真依赖已放在 `ore_sim/hkust_runtime/.venv`，约 953 MB，已被 `.gitignore` 忽略。
+
+如果 venv 缺失或换机器，用可用环境覆盖：
 
 ```bash
 cd ore_sim/hkust_runtime
-ln -sfn ~/hkust-enterprize/RM2026-Engineer-Assembly-Algorithm/.venv .venv
+VENV=/path/to/venv ./scripts/build.sh
 ```
 
-如果 venv 换了位置，用 `VENV=/path/to/venv ./scripts/build.sh`。
+`VENV` 必须能导入 `mujoco`、`hppfcl`、`scipy`、`openvino`、`glfw`、`readerwriterlock`、`rclpy`。
 
 构建：
 
