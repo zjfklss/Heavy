@@ -1,13 +1,13 @@
 # Heavy 重装自动对矿
 
-本分支只做 RoboMaster 2027 重装机器人自动对矿。自瞄代码已移到其他分支，本分支不再包含 `src/hero.cpp`、`tasks/auto_aim/`、`tasks/auto_outpost/`、`io/hero/`。
+本分支只做 RoboMaster 2027 重装机器人自动对矿。
 
-## 现有内容
+## 目录
 
 - 技术路线：`docs/重装自动对矿技术路线.md`
+- 实施方案：`docs/重装自动对矿实施方案.docx`
 - 仿真运行时：`ore_sim/hkust_runtime/`（港科 RM2026 ROS 2 + MuJoCo，尚未接入）
-- 保留复用：`tools/`、`calibration/`、`io/camera.*`、`io/hikrobot/`、标定配置与圆点板
-- 自瞄备份：本地分支 `backup/heavy-ore-sim-with-autoaim-20261113`
+- 复用内容：`tools/`、`calibration/`、`io/camera.*`、`io/hikrobot/`、标定配置与圆点板
 
 ## 构建
 

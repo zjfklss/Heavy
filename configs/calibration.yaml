@@ -1,13 +1,14 @@
-# 主路径：英雄对称小圆点板 7×7 @ 25mm（白底黑点）
+# 主路径：对称小圆点板 7×7 @ 25mm（白底黑点）
 # 大板见 calibration_10x7.yaml
 
 pattern_cols: 7
 pattern_rows: 7
 center_distance_mm: 25.0
 
+# 旧式两轴安装姿态，仅 calibrate_handeye / calibrate_robotworld_handeye 使用
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# yaw轴中心 -> pitch轴中心（mm，X前 Y左 Z上）；共点云台保持全 0
+# 旧式两轴安装偏置（mm，X前 Y左 Z上）；同一安装点时全 0
 p_yaw_to_pitch_mm: [62.11, 0.0, 151.32]
 p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]
 

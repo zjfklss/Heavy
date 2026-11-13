@@ -3,6 +3,7 @@ pattern_cols: 10
 pattern_rows: 7
 center_distance_mm: 40
 
+# 旧式两轴安装姿态与偏置，仅 handeye 工具使用
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 p_yaw_to_pitch_mm: [0.0, 0.0, 0.0]
 p_pitch_to_barrel_mm: [0.0, 0.0, 0.0]

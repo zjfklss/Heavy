@@ -8,7 +8,7 @@
 
 namespace io
 {
-// Missing fields retain the device settings used by the original SP profiles.
+// Missing fields retain the device settings used by the original camera profiles.
 struct HikRobotSettings
 {
   int image_width = 0;

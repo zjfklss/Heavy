@@ -32,7 +32,7 @@ void print_yaml(
   result << YAML::Key << "R_gimbal2imubody" << YAML::Value << YAML::Flow << R_gimbal2imubody_data;
   result << YAML::Newline << YAML::Newline;
   result << YAML::Comment(
-    "OpenCV 相机系到云台，直接给 solver。不要再乘 URDF 光学系 -pi/2 0 -pi/2");
+    "OpenCV 相机系到安装基准，直接交给后续位姿解算。不要再乘 URDF 光学系 -pi/2 0 -pi/2");
   result << YAML::Newline;
   result << YAML::Comment(fmt::format(
     "相机同理想情况的偏角: yaw {:.6f} pitch {:.6f} roll {:.6f} degree", camera_ypr[0],

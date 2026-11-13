@@ -1,5 +1,5 @@
 #pragma once
-// 小圆点板主路径（英雄 7×7 @ 25mm 对称阵）：BoardConfig + 可复用检测器
+// 小圆点板主路径（7×7 @ 25mm 对称阵）：BoardConfig + 可复用检测器
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -192,7 +192,7 @@ inline std::vector<cv::Point3f> centers_3d_planar(const BoardConfig & c)
   return points;
 }
 
-// 竖直板：原点板心，Y 右、Z 上（robotworld / 英雄约定）
+// 竖直板：原点板心，Y 右、Z 上（robotworld / 竖直板约定）
 inline std::vector<cv::Point3f> centers_3d_vertical(const BoardConfig & c)
 {
   std::vector<cv::Point3f> points;
@@ -242,8 +242,8 @@ inline bool load_intrinsics(
       return false;
     }
 
-    if (yaml["source"] && yaml["source"].as<std::string>() == "remote_hero_untuned") {
-      fmt::print(stderr, "警告: 这是远程英雄旧相机内参，本车重标定前不要用来解手眼\n");
+    if (yaml["source"] && yaml["source"].as<std::string>() == "legacy_reference_untuned") {
+      fmt::print(stderr, "警告: 这是历史参考相机内参，重标定前不要用于手眼解算\n");
     }
     if (K.size() != 9) {
       if (err) *err = fmt::format("camera_matrix size {} != 9", K.size());

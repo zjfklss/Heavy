@@ -201,7 +201,7 @@ void HikRobot::capture_start()
       cvt_param.nDstBufferSize = img.total() * img.elemSize();
       cvt_param.enDstPixelType = PixelType_Gvsp_BGR8_Packed;
 
-      // Let MVS handle the camera's actual source format; SP consumes BGR8.
+      // Let MVS handle the camera's actual source format; downstream consumes BGR8.
       ret = MV_CC_ConvertPixelType(handle_, &cvt_param);
       if (ret != MV_OK) {
         tools::logger()->warn("MV_CC_ConvertPixelType failed: {:#x}", ret);
