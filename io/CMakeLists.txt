@@ -9,7 +9,5 @@ if(HERO_MVS_INCLUDE AND HERO_MVS_LIBRARY)
   target_include_directories(io PRIVATE ${HERO_MVS_INCLUDE})
   target_link_libraries(io PUBLIC ${HERO_MVS_LIBRARY} usb-1.0)
 else()
-  message(STATUS "MVS not found: live camera unavailable; offline modes remain available")
+  message(STATUS "MVS not found: live camera unavailable")
 endif()
-
-add_subdirectory(hero)
