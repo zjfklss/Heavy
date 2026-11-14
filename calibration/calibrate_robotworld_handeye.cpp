@@ -72,6 +72,7 @@ int main(int argc, char * argv[])
   double reproj_cli = cli.get<double>("reproj-max");
 
   auto board = calib::load_board_config(config_path);
+  // AX=ZB 求解平移要求机座端存在非零平移激励；两级轴偏置同时趋零时平移子空间奇异
   if (board.p_yaw_to_pitch_mm.norm() < 1.0 && board.p_pitch_to_barrel_mm.norm() < 1.0) {
     fmt::print(stderr, "轴偏置接近 0，robotworld 平移全为零，方程退化。请改用 calibrate_handeye。\n");
     return 1;
@@ -109,6 +110,7 @@ int main(int argc, char * argv[])
       R_gimbal2imubody.transpose() * R_imubody2imuabs * R_gimbal2imubody;
     Eigen::Vector3d ypr_rad = tools::eulers(R_gimbal2world, 2, 1, 0);
     Eigen::Vector3d joint = calib::joint_from_gimbal_euler(ypr_rad) * 57.3;
+    // 只留接近纯 yaw/pitch 的姿态；横滚大说明姿态或外参对齐异常
     if (std::abs(ypr_rad[2]) > 2.0 * M_PI / 180.0) {
       fmt::print("[rejected] {} roll={:.2f}°，姿态不是纯 yaw/pitch\n", img_path, joint[2]);
       continue;
@@ -133,6 +135,7 @@ int main(int argc, char * argv[])
     fmt::print("[{}] {}\n", ok ? "success" : "failure", img_path);
     if (!ok) continue;
 
+    // OpenCV calibrateRobotWorldHandEye 要求输入 world2gimbal（与 calibrateHandEye 的 gimbal2world 相反）
     Eigen::Matrix3d R_world2gimbal_eigen = R_gimbal2world.transpose();
     Eigen::Vector3d t_gimbal2world = calib::gimbal_origin_in_world_mm(
       ypr_rad, board.p_yaw_to_pitch_mm, board.p_pitch_to_barrel_mm);
@@ -143,6 +146,7 @@ int main(int argc, char * argv[])
     cv::eigen2cv(t_world2gimbal_eigen, t_world2gimbal);
 
     cv::Mat rvec, tvec;
+    // IPPE 解共面点，避开平面翻转歧义，再用 LM 精修
     cv::solvePnP(
       obj_template, centers, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
     cv::solvePnPRefineLM(obj_template, centers, camera_matrix, distort_coeffs, rvec, tvec);
@@ -166,6 +170,7 @@ int main(int argc, char * argv[])
     return 1;
   }
 
+  // 解得 gimbal2camera 与 world2board（平移单位 mm），统一转回 m 并取逆得到 camera2gimbal / board2world
   cv::Mat R_gimbal2camera, t_gimbal2camera, R_world2board, t_world2board;
   cv::calibrateRobotWorldHandEye(
     rvecs, tvecs, R_world2gimbal_list, t_world2gimbal_list, R_world2board, t_world2board,

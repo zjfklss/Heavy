@@ -4,6 +4,7 @@
 
 #include "calibration/calib_common.hpp"
 
+// 离线内参标定：使用平面圆点板模型（Z=0，左上角为原点），与手眼标定的竖直板模型不同。
 const std::string keys =
   "{help h usage ? |                          | 输出命令行参数说明}"
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
@@ -75,6 +76,7 @@ int main(int argc, char * argv[])
   std::vector<cv::Mat> rvecs, tvecs;
   auto criteria =
     cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, DBL_EPSILON);
+  // 工业定焦镜头固定 k3=0，避免样本数偏少或视角不全时高阶径向畸变过拟合卷边
   cv::calibrateCamera(
     obj_points, img_points, img_size, camera_matrix, distort_coeffs, rvecs, tvecs, cv::CALIB_FIX_K3,
     criteria);

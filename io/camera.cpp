@@ -12,6 +12,7 @@ Camera::Camera(const std::string & config_path)
 {
 #ifdef IO_WITH_HIKROBOT
   const auto config = YAML::LoadFile(config_path);
+  // vid_pid 传空：断流后只重新打开 MVS，不走 libusb 复位（复位需要 "vid:pid"）
   camera_ = std::make_unique<HikRobot>(config["exposure_ms"].as<double>(),
     config["gain"].as<double>(), "", config["fps"].as<double>(), HikRobotSettings::load(config));
 #else

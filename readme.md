@@ -2,10 +2,12 @@
 
 本分支只做 RoboMaster 2027 重装机器人自动对矿。
 
+**交接说明（接班人先读）**：[`docs/交接说明.md`](docs/交接说明.md)
+
 ## 目录
 
 - 技术路线：`docs/重装自动对矿技术路线.md`
-- 仿真运行时：`ore_sim/hkust_runtime/`（港科 RM2026 ROS 2 + MuJoCo，已可在 Heavy 内构建，Host 尚未接入）
+- 仿真运行时：`ore_sim/hkust_runtime/`（港科 RM2026 ROS 2 + MuJoCo；五个包能编过，只验过空场景，Host 和感知还没联调）
 - 复用内容：`tools/`、`calibration/`、`io/camera.*`、`io/hikrobot/`、标定配置与圆点板
 
 ## 标定工具构建

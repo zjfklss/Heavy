@@ -7,6 +7,8 @@
 
 namespace tools
 {
+// 通用扩展卡尔曼滤波器：通过可定制的 x_add / z_subtract 支持角度跨 ±pi 等非欧氏状态空间；
+// 启用 use_adaptive_R 时会按新息协方差平滑更新 R_adaptive（注意当前更新增益 K 仍使用外部传入 R）。
 class ExtendedKalmanFilter
 {
 public:

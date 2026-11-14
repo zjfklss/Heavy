@@ -92,6 +92,7 @@ int main(int argc, char * argv[])
       R_gimbal2imubody.transpose() * R_imubody2imuabs * R_gimbal2imubody;
     Eigen::Vector3d ypr_rad = tools::eulers(R_gimbal2world, 2, 1, 0);
     Eigen::Vector3d joint = calib::joint_from_gimbal_euler(ypr_rad) * 57.3;
+    // 仅保留接近纯 yaw/pitch 的标定姿态；存在较大横滚角说明姿态或外参对齐异常
     if (std::abs(ypr_rad[2]) > 2.0 * M_PI / 180.0) {
       fmt::print("[rejected] {} roll={:.2f}°，姿态不是纯 yaw/pitch\n", img_path, joint[2]);
       continue;
@@ -122,6 +123,7 @@ int main(int argc, char * argv[])
     cv::eigen2cv(R_gimbal2world, R_gimbal2world_cv);
 
     cv::Mat rvec, tvec;
+    // IPPE 专解共面平面目标，避免普通 P3P/EPnP 的平面翻转歧义，再用 LM 精修
     cv::solvePnP(
       obj_template, centers, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
     cv::solvePnPRefineLM(obj_template, centers, camera_matrix, distort_coeffs, rvec, tvec);
@@ -144,11 +146,13 @@ int main(int argc, char * argv[])
     return 1;
   }
 
+  // 输入顺序与方向：T_gimbal2world（单位 mm）+ 相机观测到的 T_board2cam，输出 T_camera2gimbal 后转米
   cv::Mat R_camera2gimbal, t_camera2gimbal;
   cv::calibrateHandEye(
     R_gimbal2world_list, t_gimbal2world_list, rvecs, tvecs, R_camera2gimbal, t_camera2gimbal);
   t_camera2gimbal /= 1e3;
 
+  // R_gimbal2ideal 把机械基准系（X 前 Y 左 Z 上）转到理想相机光学系（Z 前 X 右 Y 下），仅用于估算安装偏角
   Eigen::Matrix3d R_camera2gimbal_eigen;
   cv::cv2eigen(R_camera2gimbal, R_camera2gimbal_eigen);
   Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};

@@ -11,6 +11,8 @@
 
 namespace tools
 {
+// 固定容量的线程安全队列：PopWhenFull=true 时队满丢弃最旧元素（用于只保最新图像帧）；
+// 注意 front() 等待非空且不响应 close()，退出同步应使用 pop() / try_pop_for()。
 template <typename T, bool PopWhenFull = false>
 class ThreadSafeQueue
 {
@@ -109,7 +111,7 @@ public:
     while (!queue_.empty()) {
       queue_.pop();
     }
-    not_empty_condition_.notify_all();  // 如果其他线程正在等待队列不为空，这样可以唤醒它们
+    not_empty_condition_.notify_all();
   }
 
   void close()

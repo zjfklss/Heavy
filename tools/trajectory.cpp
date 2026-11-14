@@ -56,6 +56,7 @@ Trajectory::Trajectory(double speed, double distance, double height, double drag
   if (!simulate(speed, distance, lower, drag, lower_height, time)) return;
   double upper = lower;
   double upper_height = lower_height;
+  // 1.5 rad 以上是另一支高抛解，这里只搜低伸
   while (upper < 1.5 && upper_height < height) {
     upper += 0.025;
     if (!simulate(speed, distance, upper, drag, upper_height, time)) return;

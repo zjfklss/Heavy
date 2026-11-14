@@ -14,6 +14,8 @@
 
 namespace io
 {
+// 海康 USB3 工业相机封装：内部以守护线程监控断流并做 USB 复位重连，
+// 采集线程写入单元素覆盖队列（queue_(1)），保证 read() 总是取最新一帧（200 ms 超时返回空图）。
 class HikRobot : public CameraBase
 {
 public:

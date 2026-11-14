@@ -72,12 +72,13 @@ Eigen::VectorXd ExtendedKalmanFilter::update(
     R_adaptive = smooth * R_adaptive + (1.0 - smooth) * innovation_cov;
   }
 
-  // 新增检验
+  // NIS/NEES 只写进绘图，不改本次更新结果
   Eigen::MatrixXd S = H * P * H.transpose() + R_used;
   double nis = residual.transpose() * S.inverse() * residual;
   double nees = (x - x_prior).transpose() * P.inverse() * (x - x_prior);
 
-  // 卡方检验阈值（自由度=4，取置信水平95%）
+  // 0.711 是 χ²(4) 的 5% 分位，不是 95% 上侧界（约 9.49）。
+  // 大于该值就记失败，滤波器正常时几乎每次都会记上。阈值先保持原值。
   constexpr double nis_threshold = 0.711;
   constexpr double nees_threshold = 0.711;
 

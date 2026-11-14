@@ -13,6 +13,7 @@ class CameraBase
 {
 public:
   virtual ~CameraBase() = default;
+  // 阻塞等待一帧图像及采样单调时间戳；超时或故障时 img 可能为空
   virtual void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp) = 0;
   virtual uint64_t frames_captured() const { return 0; }
 };

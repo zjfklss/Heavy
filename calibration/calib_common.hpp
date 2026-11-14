@@ -164,7 +164,7 @@ inline bool align_symmetric_180(
   std::vector<cv::Point2f> flipped(cur.rbegin(), cur.rend());
   const double d0 = mean(*prev, cur);
   const double d1 = mean(*prev, flipped);
-  (void)max_jump_px;
+  (void)max_jump_px;  // 参数保留，不拿它拒绝翻转：两序都很远时仍要选更近的一序
   // 姿势差很大时两序的平均位移都会很大，仍选明显更近的那一序
   if (d1 + 15.0 < d0) {
     cur.swap(flipped);
@@ -207,6 +207,7 @@ inline std::vector<cv::Point3f> centers_3d_vertical(const BoardConfig & c)
   return points;
 }
 
+// 读取文本文件中的四元数（严格按 w x y z 顺序）；文件缺失或格式非法时不报错且返回值未定义
 inline Eigen::Quaterniond read_q(const std::string & q_path)
 {
   std::ifstream q_file(q_path);

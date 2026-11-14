@@ -80,6 +80,7 @@ void HikRobot::capture_start()
     return;
   }
 
+  // 只认 yaml 里的序列号，不回退到枚举到的第一台，避免多相机时抓错
   MV_CC_DEVICE_INFO * selected = nullptr;
   for (unsigned int index = 0; index < device_list.nDeviceNum; ++index) {
     auto * device = device_list.pDeviceInfo[index];
@@ -116,7 +117,7 @@ void HikRobot::capture_start()
     return;
   }
 
-  // Clear old crop offsets before increasing the image dimensions.
+  // 必须先清零偏移再放大宽高，否则当前 Offset + 新 Width/Height 越界时 MVS SDK 会直接失败
   if (settings_.offset_x >= 0 && !set_int_value("OffsetX", 0)) return;
   if (settings_.offset_y >= 0 && !set_int_value("OffsetY", 0)) return;
   if (settings_.image_width > 0 && !set_int_value("Width", settings_.image_width)) return;
@@ -171,6 +172,7 @@ void HikRobot::capture_start()
       unsigned int nMsec = 100;
 
       ret = MV_CC_GetImageBuffer(handle_, &raw, nMsec);
+      // 1 s 内的偶发无帧超时不立即重启相机，避免触发耗时较长的 USB 复位
       if (ret == MV_E_NODATA && std::chrono::steady_clock::now() - last_frame < 1s) {
         if (!timeout_reported) {
           tools::logger()->warn("[HikRobot] Frame timeout; retrying without restarting camera");

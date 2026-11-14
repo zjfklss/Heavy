@@ -46,6 +46,7 @@ Eigen::Vector3d eulers(Eigen::Quaterniond q, int axis0, int axis1, int axis2, bo
   auto safe1 = std::abs(eulers[1]) >= eps;
   auto safe2 = std::abs(eulers[1] - CV_PI) >= eps;
   auto safe = safe1 && safe2;
+  // 中间角贴 0 或 π 时两轴不可分：内旋把剩余转角放在第三轴，外旋放在第一轴
   if (safe) {
     eulers[0] = half_sum + half_diff;
     eulers[2] = half_sum - half_diff;
