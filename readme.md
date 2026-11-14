@@ -70,4 +70,4 @@ ros2 launch arm_exchange_host sim_host.launch.py \
 - 最小仿真已验证：20 个 body、5 个插件、两路 640×640 相机、`/joint_states` 可读。
 - Host 与感知尚未启动验证；`weights` 仍未拷贝。
 - 对矿业务代码尚未实现。
-- 本分支暂不推送。
+- 本分支已推送，工作未完成。仿真源码在 `ore_sim/`；`.venv` 与构建产物不在库里。

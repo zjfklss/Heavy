@@ -1,0 +1,6 @@
+.venv/
+build/
+install/
+log/
+weights/
+__pycache__/
